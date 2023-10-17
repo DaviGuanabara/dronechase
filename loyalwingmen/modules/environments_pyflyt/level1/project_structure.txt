@@ -1,0 +1,19 @@
+.
+├── __pycache__
+│   ├── pyflyt_level1_environment.cpython-38.pyc
+│   ├── pyflyt_level1_simulation.cpython-38.pyc
+│   └── quadcopter_manager.cpython-38.pyc
+├── components
+│   ├── __pycache__
+│   │   ├── normalization.cpython-38.pyc
+│   │   ├── pyflyt_level1_simulation.cpython-38.pyc
+│   │   └── quadcopter_manager.cpython-38.pyc
+│   ├── normalization.py
+│   ├── pyflyt_level1_simulation.py
+│   ├── quadcopter_manager.py
+│   ├── test_quadcopter_manager.py
+│   └── test_simulation.py
+├── project_structure.py
+└── pyflyt_level1_environment.py
+
+4 directories, 13 files
