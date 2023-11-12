@@ -14,6 +14,12 @@ class Stage(ABC):
 #===============================================================================
     def on_reset(self):
         pass
+
+    def on_notification(self, message, publisher_id):
+        pass
+
+    def on_env_init(self):
+        pass
         
     def on_episode_start(self):
         pass
@@ -55,9 +61,17 @@ class TaskProgression:
         self.stage_dispatch = stage_dispatch
         self.update_current_stage()
 
+    def on_notification(self, message, publisher_id):
+        self.current_stage.on_notification(message, publisher_id)
+
+
     def update_current_stage(self):
         """Update the current stage based on the stage number."""
         self.current_stage = self.stage_dispatch[self._current_stage_number]
+        
+    def on_env_init(self):
+        print("task progression - on env init")
+        self.current_stage.on_env_init()
 
     def on_episode_start(self):
         """Called at the start of each episode."""

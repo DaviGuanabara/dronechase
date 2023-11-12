@@ -56,7 +56,8 @@ class L3AviarySimulation(bullet_client.BulletClient):
         self.render = render
 
         print("self.render", self.render)
-        self.drones: list[Quadcopter] = []
+        #self.drones: list[Quadcopter] = []
+        self.active_drones: dict[int, Quadcopter] = {}
         self.reset(seed)
 
     def reset(self, seed: None | int = None):
@@ -80,12 +81,47 @@ class L3AviarySimulation(bullet_client.BulletClient):
         # define new RNG
         self.np_random = np.random.RandomState(seed=seed)
 
+    
+    def step(self):
+        '''Steps the environment, this automatically handles physics and control looprates, one step is equivalent to one control loop step.'''
+
+        for _ in range(self.updates_per_step):
+            for drone in self.active_drones.values():
+                # drone.update_state()
+                # update imu is a more meaningful name
+                # describing that Lidar or other sensors are not updated.
+                drone.update_imu()
+                drone.update_control()
+                drone.update_physics()
+                    
+            self.stepSimulation()
+
+            self.physics_steps += 1
+    
+    #==========================================================================
+    #   Drone List Interface
+    #==========================================================================   
+            
+    def add_active_drone(self, drone: Quadcopter):
+        self.active_drones[drone.id] = drone
+
+    def remove_active_drone(self, drone: Quadcopter):
+        self.active_drones.pop(drone.id, None)
+        
     def has_drones(self):
         """Returns whether the simulation has any drones."""
-        return len(self.drones) > 0
-
+        return len(self.active_drones) > 0
+    
+    
+    
+    #==========================================================================
+    # Evaluation
+    #==========================================================================   
+     
+            
+    """
     def step(self):
-        """Steps the environment, this automatically handles physics and control looprates, one step is equivalent to one control loop step."""
+        '''Steps the environment, this automatically handles physics and control looprates, one step is equivalent to one control loop step.'''
 
         for _ in range(self.updates_per_step):
             if self.has_drones():
@@ -103,7 +139,7 @@ class L3AviarySimulation(bullet_client.BulletClient):
             self.stepSimulation()
 
             self.physics_steps += 1
-
+    """
 
 def on_avaluation_step():
     print("Creating environment")

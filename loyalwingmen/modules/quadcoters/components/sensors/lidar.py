@@ -4,7 +4,8 @@ from typing import Tuple, List, Dict
 import pybullet as p
 from gymnasium import spaces
 from .sensor_interface import Sensor
-from ..base.quadcopter_type import QuadcopterType
+from ..base.quadcopter_type import ObjectType
+from ....events.message_hub import MessageHub
 
 from enum import Enum, auto
 
@@ -103,14 +104,35 @@ class LiDAR(Sensor):
         
         self.DISTANCE_CHANNEL_IDX: int = Channels.DISTANCE_CHANNEL.value
         self.FLAG_CHANNEL_IDX: int = Channels.FLAG_CHANNEL.value
+        
+        self.threshold:float = 1
 
-    def _get_flag(self, entity_type: QuadcopterType) -> float:
+        self.current_step = 0
+        self.timestep = 0
+
+        self.messageHub = MessageHub()
+        self.messageHub.subscribe(
+            topic="SimulationStep", subscriber=self._subscriber_simulation_step
+        )
+    
+    def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
+        #print(f"Lidar - SimulationStep received - {message}")
+        self.current_step = message.get("step", 0)
+        self.timestep = message.get("timestep", 0)
+
+    def _get_flag(self, entity_type: ObjectType) -> float:
+        #print(entity_type)
+        object_type_length = len(ObjectType) + 1
         flag_mapping = {
-            QuadcopterType.LOITERINGMUNITION: 0,
-            QuadcopterType.LOYALWINGMAN: 0.3,
-            "OBSTACLE": 0.6,
+            ObjectType.LOITERINGMUNITION.value: ObjectType.LOITERINGMUNITION.value / object_type_length,
+            ObjectType.LOYALWINGMAN.value: ObjectType.LOYALWINGMAN.value / object_type_length,
+            ObjectType.OBSTACLE.value: ObjectType.OBSTACLE.value / object_type_length,
         }
-        return flag_mapping.get(entity_type, 1)
+        return flag_mapping.get(entity_type.value, 1)
+    
+    def _get_ObjectType_from_flag(self, flag: float) -> ObjectType:
+        object_type_length = len(ObjectType) + 1
+        return ObjectType(object_type_length * flag)
 
     # ============================================================================================================
     # Setup Functions
@@ -182,8 +204,9 @@ class LiDAR(Sensor):
 
     def _add_spherical(
         self,
+        target_id,
         spherical: np.ndarray,
-        flag: float = 0,
+        flag: float = 1,
     ):
 
         norm_distance, theta_point, phi_point = self._normalize_spherical(spherical)
@@ -202,6 +225,7 @@ class LiDAR(Sensor):
     
     def _add_end_position(
         self,
+        target_id,
         end_position: np.ndarray,
         current_position: np.ndarray = np.array([0, 0, 0]),
         flag: float = 1,
@@ -212,14 +236,14 @@ class LiDAR(Sensor):
         
         if distance > 0 and distance < self.radius:
             spherical: np.ndarray = CoordinateConverter.cartesian_to_spherical(rotated_position)
-            self._add_spherical(spherical, flag)
+            self._add_spherical(target_id, spherical, flag)
     
-    def _add_end_position_for_entity(self, position: np.ndarray, entity_type: QuadcopterType) -> None:
+    def _add_end_position_for_entity(self, position: np.ndarray, entity_type: ObjectType, target_id:int) -> None:
         """Add an ending position for a given entity type."""
         if len(position) > 0:
             current_position = self.parent_inertia["position"]
             entity_flag = self._get_flag(entity_type)
-            self._add_end_position(position, current_position, entity_flag)
+            self._add_end_position(target_id, position, current_position, entity_flag )
     
     def get_sphere(self) -> np.ndarray:
         return self.sphere
@@ -259,14 +283,44 @@ class LiDAR(Sensor):
         else:
             self.buffer_manager.buffer_message(message, publisher_id)
             
+    def calculate_extremity_points(self, position, dimensions):
+        half_dimensions = np.array(dimensions) / 2
+        return {
+            "top": position + [0, 0, half_dimensions[2]],
+            "bottom": position - [0, 0, half_dimensions[2]],
+            "left": position - [half_dimensions[0], 0, 0],
+            "right": position + [half_dimensions[0], 0, 0],
+            "front": position + [0, half_dimensions[1], 0],
+            "back": position - [0, half_dimensions[1], 0],
+        }
+    
+    def process_message(self, message):
+        """
+        This function is called by the sensor manager
+        it fetch tha data from the buffer
+        """
+        position = message.get("position")
+        dimensions = message.get("dimensions")
+        
+        if dimensions is None:
+            return position, None   
+        
+        #print(dimensions)
+        extremity_points = self.calculate_extremity_points(position, dimensions)
+        return position, extremity_points
+        
+    
     def update_data(self) -> None:
         buffer_data = self.buffer_manager.get_all_data()
         self.reset()
 
-        for _, message in buffer_data.items():
+        for target_id, message in buffer_data.items():
 
             position = message.get("position")
-            self._add_end_position_for_entity(position, message.get("publisher_type"))
+            
+            position, extremity_points = self.process_message(message)
+            #print(message.get("publisher_type"))
+            self._add_end_position_for_entity(position, message.get("publisher_type"), target_id)
 
     def read_data(self) -> Dict:
         return {"lidar": self.sphere}

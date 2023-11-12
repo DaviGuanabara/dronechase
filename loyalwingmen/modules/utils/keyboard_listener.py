@@ -10,6 +10,7 @@ class KeyboardListener:
         self.key: Optional[Union[Key, KeyCode]] = None
         self.listener = keyboard.Listener(
             on_press=self.on_press, on_release=self.on_release)
+        
         self.listener.start()
 
     def on_press(self, key: Union[Key, KeyCode, None]):

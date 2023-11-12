@@ -17,7 +17,7 @@ from stable_baselines3 import PPO
 from loyalwingmen.modules.environments_pyflyt.level3.pyflyt_level3_environment import (
     PyflytL3Enviroment as Level3,
 )
-from loyalwingmen.rl_tools.policies.ppo_policies import LidarInertialActionExtractor
+from loyalwingmen.rl_tools.policies.ppo_policies import LidarInertialActionExtractor, LidarInertialActionExtractor2
 
 from multiprocessing import cpu_count
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -29,7 +29,7 @@ import math
 
 from stable_baselines3.common.vec_env import VecMonitor
 from loyalwingmen.rl_tools.directory_manager import DirectoryManager
-
+import torch
 # ===============================================================================
 # Setup
 # ===============================================================================
@@ -47,6 +47,10 @@ def directories(study_name: str):
 
 
 def main():
+    
+    # Check if CUDA is available and set the device accordingly
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     study_name = "01.10.2023"#datetime.date.today()
     models_dir, logs_dir, output_folder = directories(study_name)
 
@@ -67,8 +71,8 @@ def main():
     nn_t = [512, 512, 128]
 
     policy_kwargs = dict(
-        features_extractor_class=LidarInertialActionExtractor,
-        features_extractor_kwargs=dict(features_dim=512),
+        features_extractor_class=LidarInertialActionExtractor2,
+        features_extractor_kwargs=dict(features_dim=512, device=device),
         net_arch=dict(pi=nn_t, vf=nn_t),
     )
 
@@ -76,7 +80,7 @@ def main():
         "MultiInputPolicy",
         vectorized_environment,
         verbose=0,
-        device="cuda",
+        device=device,
         policy_kwargs=policy_kwargs,
         learning_rate=1e-3,
         batch_size=128,

@@ -37,14 +37,18 @@ from loyalwingmen.rl_tools.pipeline import (
 )
 from loyalwingmen.rl_tools.directory_manager import DirectoryManager
 
-from loyalwingmen.rl_tools.policies.ppo_policies import LidarInertialActionExtractor
-
+from loyalwingmen.rl_tools.policies.ppo_policies import (
+    LidarInertialActionExtractor,
+    LidarInertialActionExtractor2,
+)
+import torch
 
 
 warnings.filterwarnings("ignore", category=UserWarning)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
 
 def objective(
     trial: Trial,
@@ -85,16 +89,15 @@ def suggest_parameters(trial: Trial) -> dict:
         for i in range(1, n_hiddens + 1)
     }
 
-    #suggestions["rl_frequency"] = trial.suggest_categorical(
+    # suggestions["rl_frequency"] = trial.suggest_categorical(
     #    "frequency", [1, 5, 10, 15, 30]
-    #)
+    # )
     suggestions["learning_rate"] = 10 ** trial.suggest_int("exponent", -5, -3)
     suggestions["batch_size"] = trial.suggest_categorical(
         "batch_size", [128, 256, 512, 1024]
     )
     suggestions["features_dim"] = trial.suggest_categorical("feature_dim", [512])
     return suggestions
-
 
 
 def log_suggested_parameters(suggestions: dict):
@@ -111,14 +114,16 @@ def rl_pipeline(
     logs_dir: str,
     n_eval_episodes: int = 3,
 ) -> Tuple[float, float, float]:
-    frequency = 15 #suggestions["rl_frequency"]
+    frequency = 15  # suggestions["rl_frequency"]
     learning_rate = suggestions["learning_rate"]
 
     hiddens = get_hiddens(suggestions)
 
     vectorized_environment: VecMonitor = (
         ReinforcementLearningPipeline.create_vectorized_environment(
-            environment=Level3, env_kwargs=suggestions, n_envs=8#int((os.cpu_count() or 1)/2)
+            environment=Level3,
+            env_kwargs=suggestions,
+            n_envs=int((os.cpu_count() or 1)),
         )
     )
 
@@ -138,9 +143,12 @@ def rl_pipeline(
         debug=True,
     )
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy_kwargs = dict(
-        features_extractor_class=LidarInertialActionExtractor,
-        features_extractor_kwargs=dict(features_dim=suggestions["features_dim"]),
+        features_extractor_class=LidarInertialActionExtractor2,
+        features_extractor_kwargs=dict(
+            features_dim=suggestions["features_dim"], device=device
+        ),
         net_arch=dict(pi=hiddens, vf=hiddens),
     )
 
@@ -148,7 +156,7 @@ def rl_pipeline(
         "MultiInputPolicy",
         vectorized_environment,
         verbose=0,
-        device="cuda",
+        device=device,
         policy_kwargs=policy_kwargs,
         learning_rate=suggestions["learning_rate"],
         batch_size=suggestions["batch_size"],
@@ -191,9 +199,9 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 500_000
+    n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level3_{n_timesteps_in_millions:.2f}M_30.09.2023"
+    study_name = f"level3_{n_timesteps_in_millions:.2f}M_18.10.2023"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 
