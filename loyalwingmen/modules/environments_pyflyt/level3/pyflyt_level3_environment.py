@@ -40,7 +40,7 @@ class PyflytL3Enviroment(Env):
 
         print("pyflyt level 3 environment init")
         self.message_hub = MessageHub()
-        self.step_counter = 0
+        # self.step_counter = 0
         self.task_progression.on_env_init()
         self.task_progression.on_episode_start()
         self.action_space = self._action_space()
@@ -64,6 +64,7 @@ class PyflytL3Enviroment(Env):
 
     def init_globals(self):
         self.last_action = np.zeros(4)
+        self.step_counter = 0
 
     def init_components(self, dome_radius, GUI):
         self.simulation = L3AviarySimulation(world_scale=dome_radius, render=GUI)

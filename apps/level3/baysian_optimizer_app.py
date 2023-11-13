@@ -201,7 +201,7 @@ def directories(study_name: str):
 def main():
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level3_{n_timesteps_in_millions:.2f}M_18.10.2023"
+    study_name = f"level3_{n_timesteps_in_millions:.2f}M_13.11.2023"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 

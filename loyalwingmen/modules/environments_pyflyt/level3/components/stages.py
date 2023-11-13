@@ -35,6 +35,9 @@ class L3Stage1(Stage):
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
+        self.NUM_PURSUERS = 1
+        self.NUM_INVADERS = 2
+
         self.MAX_REWARD = 1000
         self.PROXIMITY_THRESHOLD = 2
         self.PROXIMITY_PENALTY = 1000
@@ -320,13 +323,13 @@ class L3Stage1(Stage):
         self.quadcopter_manager.replace_quadcopters(pursuers, positions)
 
     def spawn_invader_squad(self):
-        num_invaders = 2
-        positions = self.generate_positions(num_invaders, self.dome_radius)  # /2
+        # num_invaders = 2
+        positions = self.generate_positions(self.NUM_INVADERS, self.dome_radius)  # /2
         self.quadcopter_manager.spawn_invader(positions, "invader")
 
     def spawn_pursuer_squad(self):
-        num_pursuers = 1
-        positions = self.generate_positions(num_pursuers, 2)
+        # num_pursuers = 1
+        positions = self.generate_positions(self.NUM_PURSUERS, 2)
         self.quadcopter_manager.spawn_pursuer(
             positions, "pursuer", lidar_radius=self.dome_radius
         )
