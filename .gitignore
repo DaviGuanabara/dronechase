@@ -180,3 +180,19 @@ apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_d
 apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[512, 512, 512\]-f15-lr0.0001/best_model.zip
 apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[512, 512, 512\]-f15-lr0.0001/mPPO-r-1730.8736572265625-sd72.58047485351562.zip
 apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/results_level3_2.00M_18.10.2023.xlsx
+apps/level3/result_with_lidar.prof
+apps/level3/ppo_level3_lidar.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/results_level3_0.50M_13.11.2023.xlsx
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[512, 512, 512\]-f15-lr0.001/mPPO-r1044.267333984375-sd50.94416046142578.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[512, 256, 256\]-f15-lr0.0001/mPPO-r-188.9700469970703-sd1071.6800537109375.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[512, 256, 128\]-f15-lr1e-05/mPPO-r-6039.3515625-sd1108.619384765625.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[256, 512, 512\]-f15-lr1e-05/mPPO-r-336.41845703125-sd941.091796875.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[256, 512, 512\]-f15-lr0.001/mPPO-r834.7778930664062-sd957.1555786132812.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 512, 512\]-f15-lr0.0001/mPPO-r-510.5843200683594-sd878.9794921875.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 512, 256\]-f15-lr0.0001/mPPO-r-2858.219482421875-sd1022.2105712890625.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 256, 512\]-f15-lr0.001/mPPO-r1236.7200927734375-sd136.3643341064453.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 256, 256\]-f15-lr0.001/mPPO-r-1447.7684326171875-sd164.38037109375.zip
+apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 128, 128\]-f15-lr0.0001/mPPO-r948.256103515625-sd139.45851135253906.zip
+apps/level3/mPPO-r-668-intel-15.11.2023.zip
+apps/level3/mPPO-r-668-intel-15.11.2023-lw1-lm1.zip
+*.prof

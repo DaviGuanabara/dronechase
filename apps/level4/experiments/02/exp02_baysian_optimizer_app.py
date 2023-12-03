@@ -26,21 +26,20 @@ from optuna.samplers import TPESampler
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
+from loyalwingmen.environments.level4.exp02_environment import Exp02Environment
 
-from loyalwingmen.modules.environments_pyflyt.level3.pyflyt_level3_environment import (
-    PyflytL3Enviroment as Level3,
-)
-from loyalwingmen.rl_tools.pipeline import (
+from loyalwingmen.rl_framework.utils.pipeline import (
     ReinforcementLearningPipeline,
     callbacklist,
     CallbackType,
 )
-from loyalwingmen.rl_tools.directory_manager import DirectoryManager
 
-from loyalwingmen.rl_tools.policies.ppo_policies import (
+from loyalwingmen.rl_framework.utils.directory_manager import DirectoryManager
+from loyalwingmen.rl_framework.agents.policies.ppo_policies import (
     LidarInertialActionExtractor,
     LidarInertialActionExtractor2,
 )
+
 import torch
 
 
@@ -121,7 +120,7 @@ def rl_pipeline(
 
     vectorized_environment: VecMonitor = (
         ReinforcementLearningPipeline.create_vectorized_environment(
-            environment=Level3,
+            environment=Exp02Environment,
             env_kwargs=suggestions,
             n_envs=int((os.cpu_count() or 1)),
         )
@@ -189,7 +188,7 @@ def get_hiddens(suggestion):
 
 def directories(study_name: str):
     app_name, _ = os.path.splitext(os.path.basename(__file__))
-    output_folder = os.path.join("output_level3", app_name, study_name)
+    output_folder = os.path.join("exp02_output", app_name, study_name)
     DirectoryManager.create_directory(output_folder)
 
     models_dir = os.path.join(output_folder, "models_dir")
@@ -201,7 +200,7 @@ def directories(study_name: str):
 def main():
     n_timesteps = 500_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level3_{n_timesteps_in_millions:.2f}M_14.11.2023_office_pc"
+    study_name = f"exp02_{n_timesteps_in_millions:.2f}M_dome_radius_20_02.12.2023"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 
