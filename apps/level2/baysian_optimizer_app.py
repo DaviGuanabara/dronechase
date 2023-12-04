@@ -27,24 +27,29 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
 
-from loyalwingmen.modules.environments_pyflyt.level2.pyflyt_level2_environment import (
+from loyalwingmen.environments.level2.pyflyt_level2_environment import (
     PyflytL2Enviroment as Level2,
 )
-from loyalwingmen.rl_tools.pipeline import (
+
+from loyalwingmen.rl_framework.utils.pipeline import (
     ReinforcementLearningPipeline,
     callbacklist,
     CallbackType,
 )
-from loyalwingmen.rl_tools.directory_manager import DirectoryManager
 
-from loyalwingmen.rl_tools.policies.ppo_policies import LidarInertialActionExtractor
+from loyalwingmen.rl_framework.utils.directory_manager import DirectoryManager
 
+from loyalwingmen.rl_framework.agents.policies.ppo_policies import (
+    # LidarInertialActionExtractor,
+    LidarInertialActionExtractor2,
+)
 
 
 warnings.filterwarnings("ignore", category=UserWarning)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
 
 def objective(
     trial: Trial,
@@ -81,20 +86,19 @@ def suggest_parameters(trial: Trial) -> dict:
 
     n_hiddens = trial.suggest_int("n_hiddens", 3, 3)
     suggestions = {
-        f"hidden_{i}": trial.suggest_categorical(f"hiddens_{i}", [128, 256, 512])
+        f"hidden_{i}": trial.suggest_categorical(f"hiddens_{i}", [128, 256, 512, 1024])
         for i in range(1, n_hiddens + 1)
     }
 
     suggestions["rl_frequency"] = trial.suggest_categorical(
-        "frequency", [1, 5, 10, 15, 30]
+        "frequency", [15]  # [1, 5, 10, 15, 30]
     )
-    suggestions["learning_rate"] = 10 ** trial.suggest_int("exponent", -4, -3)
+    suggestions["learning_rate"] = 10 ** trial.suggest_int("exponent", -6, -2)
     suggestions["batch_size"] = trial.suggest_categorical(
-        "batch_size", [128, 256, 512, 1024]
+        "batch_size", [32, 64, 128, 256, 512, 1024]
     )
     suggestions["features_dim"] = trial.suggest_categorical("feature_dim", [512])
     return suggestions
-
 
 
 def log_suggested_parameters(suggestions: dict):
@@ -139,7 +143,7 @@ def rl_pipeline(
     )
 
     policy_kwargs = dict(
-        features_extractor_class=LidarInertialActionExtractor,
+        features_extractor_class=LidarInertialActionExtractor2,
         features_extractor_kwargs=dict(features_dim=suggestions["features_dim"]),
         net_arch=dict(pi=hiddens, vf=hiddens),
     )
@@ -191,9 +195,9 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 2_000_000
+    n_timesteps = 1_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level2_{n_timesteps_in_millions:.2f}M_30.09.2023"
+    study_name = f"level2_{n_timesteps_in_millions:.2f}M_03.12.2023_baysian"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 

@@ -3,7 +3,7 @@ import sys
 sys.path.append("..")
 from stable_baselines3 import PPO
 
-from loyalwingmen.modules.environments_pyflyt.level2.pyflyt_level2_environment import (
+from loyalwingmen.environments.level2.pyflyt_level2_environment import (
     PyflytL2Enviroment as Level2,
 )
 import cProfile
@@ -11,8 +11,8 @@ import pstats
 
 
 def setup_environment():
-    env = Level2(GUI=True, rl_frequency=30)
-    model = PPO.load("./ppo_level2_lidar")
+    env = Level2(GUI=True, rl_frequency=15)
+    model = PPO.load("./ppo_level2_lidar_03_12_2023")
     observation, _ = env.reset(0)
     return env, model, observation
 
@@ -23,7 +23,7 @@ def on_avaluation_step(env: Level2, model, observation):
         observation, reward, terminated, truncated, info = env.step(action)
 
         # logging.debug(f"(main) reward: {reward}")
-        #print(f"reward:{reward:.2f} - action:{action} - observation:{observation}")
+        # print(f"reward:{reward:.2f} - action:{action} - observation:{observation}")
 
         if terminated:
             print("terminated")
@@ -32,24 +32,25 @@ def on_avaluation_step(env: Level2, model, observation):
 
 def main():
     env, model, observation = setup_environment()
-    cProfile.runctx(
-        "on_avaluation_step(env, model, observation)",
-        {
-            "env": env,
-            "model": model,
-            "observation": observation,
-            "on_avaluation_step": on_avaluation_step,
-        },
-        {},
-    )
-    cProfile.run(
-        "on_avaluation_step(env, model, observation)", "result_with_lidar.prof"
-    )
+    on_avaluation_step(env, model, observation)
+    # cProfile.runctx(
+    #    "on_avaluation_step(env, model, observation)",
+    #    {
+    #        "env": env,
+    #        "model": model,
+    #        "observation": observation,
+    #        "on_avaluation_step": on_avaluation_step,
+    #    },
+    #    {},
+    # )
+    # cProfile.run(
+    #    "on_avaluation_step(env, model, observation)", "result_with_lidar.prof"
+    # )
 
-    stats = pstats.Stats("result_with_lidar.prof")
-    #stats.sort_stats("cumulative").print_stats(
+    # stats = pstats.Stats("result_with_lidar.prof")
+    # stats.sort_stats("cumulative").print_stats(
     #    2
-    #)  # Show the top 40 functions by cumulative time
+    # )  # Show the top 40 functions by cumulative time
 
 
 if __name__ == "__main__":

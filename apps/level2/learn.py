@@ -14,21 +14,29 @@ from datetime import datetime
 import os
 from stable_baselines3 import PPO
 
-from loyalwingmen.modules.environments_pyflyt.level2.pyflyt_level2_environment import (
+
+from loyalwingmen.environments.level2.pyflyt_level2_environment import (
     PyflytL2Enviroment as Level2,
 )
-from loyalwingmen.rl_tools.policies.ppo_policies import LidarInertialActionExtractor
+from loyalwingmen.rl_framework.agents.policies.ppo_policies import (
+    LidarInertialActionExtractor2,
+    # LidarInertialActionExtractor,
+)
+
+# from loyalwingmen.rl_tools.policies.ppo_policies import LidarInertialActionExtractor
 
 from multiprocessing import cpu_count
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from loyalwingmen.rl_tools.callback_factory import callbacklist
+from loyalwingmen.rl_framework.utils.callback_factory import callbacklist
+
 import torch.nn as nn
 import torch as th
 import math
 
 from stable_baselines3.common.vec_env import VecMonitor
-from loyalwingmen.rl_tools.directory_manager import DirectoryManager
+from loyalwingmen.rl_framework.utils.directory_manager import DirectoryManager
+
 
 # ===============================================================================
 # Setup
@@ -47,7 +55,7 @@ def directories(study_name: str):
 
 
 def main():
-    study_name = "01.10.2023"#datetime.date.today()
+    study_name = "03.12.2023"  # datetime.date.today()
     models_dir, logs_dir, output_folder = directories(study_name)
 
     number_of_logical_cores = cpu_count()
@@ -67,7 +75,7 @@ def main():
     nn_t = [512, 512, 128]
 
     policy_kwargs = dict(
-        features_extractor_class=LidarInertialActionExtractor,
+        features_extractor_class=LidarInertialActionExtractor2,  # LidarInertialActionExtractor2,  #
         features_extractor_kwargs=dict(features_dim=512),
         net_arch=dict(pi=nn_t, vf=nn_t),
     )
@@ -83,8 +91,8 @@ def main():
     )
 
     print(model.policy)
-    model.learn(total_timesteps=2_000_000, callback=callback_list)
-    model.save("ppo_level2_lidar")
+    model.learn(total_timesteps=500_000, callback=callback_list)
+    model.save("ppo_level2_lidar_03_12_2023")
 
 
 if __name__ == "__main__":
