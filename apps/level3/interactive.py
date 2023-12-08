@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_directory)
@@ -12,8 +13,8 @@ sys.path.append(grand_parent_directory)
 
 from stable_baselines3.common.env_checker import check_env
 
-from loyalwingmen.modules.utils.keyboard_listener import KeyboardListener
-from loyalwingmen.modules.environments_pyflyt.level3.pyflyt_level3_environment import (
+from loyalwingmen.environments.utils.keyboard_listener import KeyboardListener
+from loyalwingmen.environments.level3.pyflyt_level3_environment import (
     PyflytL3Enviroment as Level3,
 )
 
@@ -31,8 +32,10 @@ for _ in range(50_000):
     # action = np.array(np.random.rand(4))
     # action = np.array([0, 0, 0, 0.5])
     observation, reward, terminated, truncated, info = env.step(action)
-    print(observation["gun"])
+    # print(observation["gun"])
+    print(f"reward:{reward:.2f}, gun observation:{observation['gun']}")
     # log(f"reward:{reward:.2f}")
+    time.sleep(0.01)
 
     if terminated:
         observation, info = env.reset()

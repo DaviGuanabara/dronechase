@@ -14,6 +14,8 @@ from .components.task_progression import TaskProgression
 from .components.stages import L3Stage1 as Stage1
 from ...notification_system.message_hub import MessageHub
 
+from ...notification_system.topics_enum import Topics_Enum
+
 
 class PyflytL3Enviroment(Env):
     """
@@ -60,7 +62,7 @@ class PyflytL3Enviroment(Env):
         self.dome_radius = dome_radius
         self.debug_on = GUI
         self.show_name_on = GUI
-        self.max_step_calls = 20 * rl_frequency
+        self.max_step_calls = 300
 
     def init_globals(self):
         self.last_action = np.zeros(4)
@@ -142,7 +144,7 @@ class PyflytL3Enviroment(Env):
 
         self.step_counter += 1
         self.message_hub.publish(
-            "SimulationStep",
+            Topics_Enum.AGENT_STEP_BROADCAST.value,
             {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
             0,
         )

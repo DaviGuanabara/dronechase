@@ -195,7 +195,7 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 1_000_000
+    n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
     study_name = f"level2_{n_timesteps_in_millions:.2f}M_03.12.2023_baysian"
 

@@ -250,10 +250,12 @@ class PyflytL2Enviroment(Env):
             ),
         )
 
+        gun_state = pursuer.gun_state
         return {
             "lidar": lidar.astype(np.float32),
             "inertial_data": inertial_data.astype(np.float32),
             "last_action": self.last_action.astype(np.float32),
+            "gun": gun_state.astype(np.float32),
         }
 
     def _observation_space(self):
@@ -297,6 +299,12 @@ class PyflytL2Enviroment(Env):
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
+                "gun": spaces.Box(
+                    -1,
+                    1,
+                    shape=observation_shape["gun"],
+                    dtype=np.float32,
+                ),
             }
         )
 
@@ -312,10 +320,13 @@ class PyflytL2Enviroment(Env):
         lidar_shape = pursuer.lidar_shape
         last_action_shape = 4
 
+        gun_state_shape = pursuer.gun_state_shape
+
         return {
             "lidar": lidar_shape,
             "inertial_data": inertial_data,
             "last_action": last_action_shape,
+            "gun": gun_state_shape,
         }
 
     def get_keymap(self):

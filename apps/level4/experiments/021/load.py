@@ -11,9 +11,7 @@ import pstats
 
 def setup_environment():
     env = Exp021Environment(GUI=True, rl_frequency=15)
-    model = PPO.load(
-        "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level4\\experiments\\021\\exp02_output\\exp021_baysian_optimizer_app\\exp021_0.50M_dome_radius_20_02.12.2023\\models_dir\\h[512, 128, 128]-f15-lr0.0001\\mPPO-r156.59059143066406-sd163.1992950439453.zip"
-    )
+    model = PPO.load("exp021")
 
     observation, _ = env.reset(0)
     return env, model, observation

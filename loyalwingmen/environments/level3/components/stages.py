@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 import numpy as np
-from .quadcopter_manager import QuadcopterManager
+from .quadcopter_manager import QuadcopterManager, Quadcopter
 from .task_progression import StageStatus, Stage
 from abc import ABC
 
 from .offsets_handler import OffsetHandler
-from ....events.message_hub import MessageHub
+from ....notification_system.message_hub import MessageHub
+from ....notification_system.topics_enum import Topics_Enum
 from typing import Dict, Optional
 
 
@@ -27,16 +28,21 @@ class L3Stage1(Stage):
 
         self.messageHub = MessageHub()
         self.messageHub.subscribe(
-            topic="SimulationStep", subscriber=self._subscriber_simulation_step
+            topic=Topics_Enum.AGENT_STEP_BROADCAST.value,
+            subscriber=self._subscriber_simulation_step,
         )
+
+        print("L3Stage1 instatiated")
 
     def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
         self.current_step = message.get("step", 0)
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
-        self.NUM_PURSUERS = 1
-        self.NUM_INVADERS = 2
+        self.NUM_PURSUERS = (
+            2  # (1 for the RL Agent, and the other to simulate the support pursuer)
+        )
+        self.NUM_INVADERS = 1
 
         self.MAX_REWARD = 1000
         self.PROXIMITY_THRESHOLD = 2
@@ -79,13 +85,18 @@ class L3Stage1(Stage):
     def on_episode_start(self):
         # print("\n\nOn Episode Start\n\n")
         self.quadcopter_manager.arm_all()
-        self.replace_invaders()
-        self.replace_pursuers()
+        # print("All quadcopters armed")
+
         self.offset_handler.on_episode_start()
         # print("episode started")
 
     def on_episode_end(self):
         self.init_globals()
+        self.quadcopter_manager.disarm_all()
+        self.replace_invaders()
+        self.replace_pursuers()
+
+        # print("All quadcopters replaced")
 
     def on_step_start(self):
         """
@@ -93,6 +104,8 @@ class L3Stage1(Stage):
         It aims to set the environment to the simulation step execution.
         """
         self.quadcopter_manager.drive_invaders()
+        self.quadcopter_manager.drive_support_pursuers()
+        pass
 
     def on_step_middle(self):
         """
@@ -105,11 +118,26 @@ class L3Stage1(Stage):
         # self.update_building_life()
 
         successful_shots, pursuers_exploded = self.process_nearby_invaders()
-        self.process_invaders_in_origin()
-        reward = self.compute_reward(successful_shots, pursuers_exploded)
+        # self.process_invaders_in_origin()
+        gun_availability: bool = self.check_gun_availability()
+
+        reward = self.compute_reward(
+            successful_shots, pursuers_exploded, gun_availability
+        )
 
         termination = self.compute_termination()
+
+        armed_invaders = self.quadcopter_manager.get_armed_invaders()
+        if len(armed_invaders) == 0:
+            self.replace_invaders()
+            invaders = self.quadcopter_manager.get_all_invaders()
+            self.quadcopter_manager.arm_by_quadcopter(invaders[0])
+
         return reward, termination
+
+    def check_gun_availability(self) -> bool:
+        pursuer: Quadcopter = self.quadcopter_manager.get_all_pursuers()[0]
+        return pursuer.is_gun_available
 
     def process_nearby_invaders(self):
         successful_shots = 0
@@ -161,7 +189,12 @@ class L3Stage1(Stage):
     # Reward and Termination
     # ===============================================================================
 
-    def compute_reward(self, successful_shots: int = 0, pursuers_exploded: int = 0):
+    def compute_reward(
+        self,
+        successful_shots: int = 0,
+        pursuers_exploded: int = 0,
+        gun_available: bool = True,
+    ):
         # Initialize reward components
         score, bonus, penalty = 0, 0, 0
 
@@ -175,54 +208,18 @@ class L3Stage1(Stage):
 
         # =======================================================================
         # Calculate Base Score
-        #
-        # Ideal Distance: Define this as the shoot range minus a small buffer (e.g., shoot range - 0.1). This gives the pursuer some leeway to maneuver without getting too close to the invader.
-        # 1. Reward for Being Near the Ideal Distance: Provide a positive reward when the pursuer is near this ideal distance. The closer it is to the ideal distance, the higher the reward.
-        # 2. Penalty for Being Too Far: If the pursuer is farther than the shoot range, it should receive a negative reward proportional to the excess distance.
-        # 3. High Penalty for Getting Too Close: Since getting closer than 0.2 units results in destruction, the penalty should be significantly higher as the pursuer approaches this limit. A high value for
-        # γ makes sense here.
         # =======================================================================
+        score = -current_closest_distance if gun_available else current_closest_distance
 
-        variation = 0.2
-        alpha = 1
-        beta = 5
-        gamma = 5
-        # TODO: Ajustar a função abaixo de tal forma que a torne continua. A transição entre as duas últimas estão contínuas, menos a da primeira com a da segunda.
-        if current_closest_distance > self.PURSUER_SHOOT_RANGE + variation:
-            score = alpha * (
-                self.PURSUER_SHOOT_RANGE + variation - current_closest_distance
-            )
+        # bonification for getting closer to the invader
+        if gun_available and current_closest_distance < last_closest_distance:
+            bonus += last_closest_distance - current_closest_distance
 
-        elif current_closest_distance >= self.PURSUER_SHOOT_RANGE - variation:
-            score = beta + self.PURSUER_SHOOT_RANGE - current_closest_distance
+        # bonification for getting far from the invader
+        if not gun_available and current_closest_distance < last_closest_distance:
+            bonus += -(last_closest_distance - current_closest_distance)
 
-        else:
-            score = (beta + variation) - np.exp(
-                -gamma
-                * (current_closest_distance - (self.PURSUER_SHOOT_RANGE - variation))
-            )
-
-        # =======================================================================
-        # Bonuses
-        # 1. Bonus for Getting Closer: If the pursuer gets closer to the invader, it should receive a positive reward proportional to the distance it has moved.
-        # 2. Bonus for Capturing Invaders: If the pursuer captures an invader, it should receive a large positive reward.
-        # =======================================================================
-
-        # Bonus for getting closer to the target
-        if current_closest_distance < last_closest_distance:
-            bonus += -(current_closest_distance - last_closest_distance)
-
-        # Bonus for capturing invaders
         bonus += self.MAX_REWARD * successful_shots
-
-        # =======================================================================
-        # Penalties
-        # 1. Penalty for lost a pursuer: If the pursuer is destroyed, it should receive a large negative reward.
-        # 2. Penalty for pursuers outside the dome: If the pursuer is outside the dome, it should receive a large negative reward.
-        # 3. Penalty for touching the gound: If the pursuer touches the ground, it should receive a large negative reward.
-        # 4. Penalty for time passing
-        # =======================================================================
-
         penalty += self.MAX_REWARD * pursuers_exploded
 
         # Penalty for pursuers outside the dome
@@ -232,16 +229,6 @@ class L3Stage1(Stage):
         if num_pursuer_outside_dome > 0:
             penalty += self.MAX_REWARD
 
-        # Penalty for building life deviation
-        # if self.building_life < self.max_building_life:
-        #    penalty += self.MAX_REWARD * (self.max_building_life - self.building_life)
-
-        # pusuers_touched_ground = self.offset_handler.identify_pursuer_touched_ground()
-        # if len(pusuers_touched_ground) > 0:
-        #    penalty += self.MAX_REWARD * len(pusuers_touched_ground)
-
-        theta = 0.025  # this theta and the limit of 300 steps ensures that the max penalty at the end of episode is about 1000
-        penalty += theta * self.current_step
         return score + bonus - penalty
 
     def compute_termination(self) -> bool:
@@ -272,9 +259,9 @@ class L3Stage1(Stage):
             return True
 
         # All invaders captured.
-        if len(self.quadcopter_manager.get_armed_invaders()) == 0:
-            self._stage_status = StageStatus.SUCCESS
-            return True
+        # if len(self.quadcopter_manager.get_armed_invaders()) == 0:
+        #    self._stage_status = StageStatus.SUCCESS
+        #    return True
 
         # All pursuers destroyed.
         if len(self.quadcopter_manager.get_armed_pursuers()) == 0:
@@ -297,8 +284,8 @@ class L3Stage1(Stage):
     # ===============================================================================
 
     def generate_positions(self, num_positions: int, r: float) -> np.ndarray:
-        # Random azimuthal angles limited to 0 to pi for x > 0
-        thetas = np.random.uniform(0, np.pi, num_positions)
+        # Random azimuthal angles limited to 0 to 2 * pi for x > 0
+        thetas = np.random.uniform(0, 2 * np.pi, num_positions)
 
         # Random polar angles limited to 0 to pi/2 for z > 0
         phis = np.random.uniform(0, np.pi / 2, num_positions)
@@ -313,7 +300,7 @@ class L3Stage1(Stage):
     def replace_invaders(self):
         # self.quadcopter_manager.disarm_all()
         invaders = self.quadcopter_manager.get_all_invaders()
-        positions = self.generate_positions(len(invaders), self.dome_radius / 2)
+        positions = self.generate_positions(len(invaders), 3)
         self.quadcopter_manager.replace_quadcopters(invaders, positions)
 
     def replace_pursuers(self):
@@ -324,14 +311,15 @@ class L3Stage1(Stage):
 
     def spawn_invader_squad(self):
         # num_invaders = 2
-        positions = self.generate_positions(self.NUM_INVADERS, self.dome_radius)  # /2
+        positions = self.generate_positions(self.NUM_INVADERS, 3)  # /2
         self.quadcopter_manager.spawn_invader(positions, "invader")
 
     def spawn_pursuer_squad(self):
         # num_pursuers = 1
-        positions = self.generate_positions(self.NUM_PURSUERS, 2)
+        positions = self.generate_positions(self.NUM_PURSUERS, 1)
+        # print("Spawning pursuers, positions: ", positions)
         self.quadcopter_manager.spawn_pursuer(
-            positions, "pursuer", lidar_radius=self.dome_radius
+            positions, ["RL Agent", "supporter"], lidar_radius=self.dome_radius
         )
 
     def get_invaders_positions(self):

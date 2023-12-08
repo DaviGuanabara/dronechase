@@ -198,7 +198,7 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 500_000
+    n_timesteps = 1_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
     study_name = f"exp02_{n_timesteps_in_millions:.2f}M_dome_radius_20_02.12.2023"
 

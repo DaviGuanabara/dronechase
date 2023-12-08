@@ -3,16 +3,18 @@ import sys
 sys.path.append("..")
 from stable_baselines3 import PPO
 
-from loyalwingmen.modules.environments_pyflyt.level3.pyflyt_level3_environment import (
+from loyalwingmen.environments.level3.pyflyt_level3_environment import (
     PyflytL3Enviroment as Level3,
 )
+
 import cProfile
 import pstats
 
 
 def setup_environment():
+    path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output_level3\\baysian_optimizer_app\\level3_1.00M_05_12.2023_office_pc\\models_dir\\h[256, 256, 512]-f15-lr1e-05\\mPPO-r-1089.50146484375-sd207.8416748046875.zip"
     env = Level3(GUI=True, rl_frequency=15)
-    model = PPO.load("mPPO-r-668-intel-15.11.2023")
+    model = PPO.load(path)
     observation, _ = env.reset(0)
     return env, model, observation
 

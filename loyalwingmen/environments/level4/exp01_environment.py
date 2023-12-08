@@ -24,8 +24,10 @@ from ...notification_system.message_hub import MessageHub
 
 class Exp01Environment(Env):
     """
-    This class aims to demonstrate a environment with one Loyal Wingmen and one Loitering Munition,
-    in a simplest way possible.
+    This class aims to demonstrate a environment with one Loyal Wingmen (CONTROLLED BY AN BEHAVIOR TREE) and an linearly increasing number of Loitering Munition,
+    starting by one. It is diveded by waves. Each wave has a number of Loitering Munition equal to the wave number.
+    The Loyal Wingmen must to destroy all Loitering Munition before the next wave starts. Loyalwingman has a limited number of bullets, 20,
+    limiting the number of waves up to 6 (6 waves means 21 loitering munitions engaged).
     It was developed for Stable Baselines 3 2.0.0 or higher.
     Gym Pybullet Drones was an inspiration for this project. For more: https://github.com/utiasDSL/gym-pybullet-drones
 

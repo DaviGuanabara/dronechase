@@ -25,7 +25,7 @@ class Exp021_Task(Task):
         entities_manager: EntitiesManager,
         dome_radius: float,
         # debug_on: bool = False,
-        building_position: np.ndarray = np.array([0, 0, 0.1]),
+        building_position: np.ndarray = np.array([0, 0, 0.1]),  # type: ignore
     ):
         print("Exp021_Task init")
 
@@ -56,11 +56,13 @@ class Exp021_Task(Task):
     def init_constants(self):
         self.NUM_PURSUERS = 1
         self.munition_per_defender = 20
-        self.MAX_NUMBER_OF_ROUNDS = self.calculate_rounds(
-            self.NUM_PURSUERS, self.munition_per_defender
-        )
+        # self.MAX_NUMBER_OF_ROUNDS = 1  # self.calculate_rounds(
+        # self.NUM_PURSUERS, self.munition_per_defender
+        # )
 
-        self.NUM_INVADERS = self.MAX_NUMBER_OF_ROUNDS
+        self.MAX_NUMBER_OF_INVADERS = 1
+        self.MAX_NUMBER_OF_ROUNDS = 20
+        self.NUM_INVADERS = self.MAX_NUMBER_OF_INVADERS  # self.MAX_NUMBER_OF_ROUNDS
         # self.NUM_INVADERS = 1
 
         self.current_round = 1
@@ -153,10 +155,14 @@ class Exp021_Task(Task):
         self.entities_manager.disarm_all_invaders()
 
         invaders = self.entities_manager.get_all_invaders()
-
-        for i in range(current_round):
+        num_invaders_to_arm = (
+            current_round
+            if current_round <= self.MAX_NUMBER_OF_INVADERS
+            else self.MAX_NUMBER_OF_INVADERS
+        )
+        for i in range(num_invaders_to_arm):
             # TODO: Find a better way to do this
-            positions = self.generate_positions(1, 4, 3)
+            positions = self.generate_positions(1, 3, 2, 0.2)
             self.entities_manager.replace_quadcopter(invaders[i], positions[0])
             self.entities_manager.arm_by_quadcopter(invaders[i])
 
@@ -491,36 +497,51 @@ class Exp021_Task(Task):
     # Others Implementations
     # ===============================================================================
 
-    def generate_positions(
-        self, num_positions: int, r_max: int, r_min: int = 5
-    ) -> np.ndarray:
-        # Random azimuthal angles limited to 0 to pi for x > 0
-        thetas = np.random.uniform(0, np.pi, num_positions)
+    import numpy as np
 
-        # Random polar angles limited to 0 to pi/2 for z > 0
-        phis = np.random.uniform(0, np.pi / 2, num_positions)
+    def generate_positions(
+        self, num_positions: int, r_max: int, r_min: int = 5, z_min: float = 2
+    ) -> np.ndarray:
+        # Adjust r_min and r_max to ensure r_min is not greater than r_max
+        r_min = min(r_min, r_max)
+        r_max = max(r_min, r_max)
+
+        # Adjust z_min to be less than or equal to r_min
+        z_min = min(z_min, r_min)
+
+        # Random azimuthal angles from 0 to 2pi for full coverage around the Z-axis
+        thetas = np.random.uniform(0, 2 * np.pi, num_positions)
+
+        # Vectorized random radius selection for each position
+        rs = np.random.uniform(r_min, r_max, num_positions)
+
+        # Calculate minimum phi for each position based on z_min and radius
+        phi_min = np.arccos(z_min / rs)
+
+        # Random polar angles from phi_min to pi/2 for z >= z_min
+        phis = np.random.uniform(phi_min, np.pi / 2, num_positions)
 
         # Convert to Cartesian coordinates using broadcasting
-        r_min = r_max if r_min > r_max else r_min
-        r = r_max if r_min == r_max else np.random.randint(r_min, r_max)
-        xs = r * np.sin(phis) * np.cos(thetas)
-        ys = r * np.sin(phis) * np.sin(thetas)
-        zs = r * np.cos(phis)
+        xs = rs * np.sin(phis) * np.cos(thetas)
+        ys = rs * np.sin(phis) * np.sin(thetas)
+        zs = rs * np.cos(phis)
 
         return np.column_stack((xs, ys, zs))
 
-    def replace_invaders(self):
-        invaders = self.entities_manager.get_all_invaders()
-        positions = self.generate_positions(len(invaders), 6, 4)
-        self.entities_manager.replace_quadcopters(invaders, positions)
+    # def replace_invaders(self):
+    #    invaders = self.entities_manager.get_all_invaders()
+    #    positions = self.generate_positions(len(invaders), 7, 5, 3)
+    #    self.entities_manager.replace_quadcopters(invaders, positions)
 
     def replace_pursuers(self):
         pursuers = self.entities_manager.get_all_pursuers()
-        positions = np.array([[0, 0, 2]])
+        positions = self.generate_positions(
+            self.NUM_PURSUERS, 1, 1, 1
+        )  # np.array([[0, 0, 2]])
         self.entities_manager.replace_quadcopters(pursuers, positions)
 
     def spawn_invader_squad(self):
-        positions = self.generate_positions(self.NUM_INVADERS, 4, 3)
+        positions = self.generate_positions(self.NUM_INVADERS, 3, 2, 0.2)
         invaders: List[Quadcopter] = self.entities_manager.spawn_invader(
             positions, "invader"
         )
@@ -530,7 +551,7 @@ class Exp021_Task(Task):
 
     def spawn_pursuer_squad(self):
         # num_pursuers = 1
-        positions = self.generate_positions(self.NUM_PURSUERS, 1)
+        positions = self.generate_positions(self.NUM_PURSUERS, 1, 1, 1)
         # np.array([[0, 5, 2]])  # self.generate_positions(self.NUM_PURSUERS, 2)
 
         self.pursuers_positions = positions

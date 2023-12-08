@@ -196,3 +196,6 @@ apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_d
 apps/level3/mPPO-r-668-intel-15.11.2023.zip
 apps/level3/mPPO-r-668-intel-15.11.2023-lw1-lm1.zip
 *.prof
+*.zip
+*.xlsx
+*.npz

@@ -1,7 +1,7 @@
 import numpy as np
 from dataclasses import dataclass
 from .quadcopter_manager import QuadcopterManager
-from loyalwingmen.modules.quadcoters.components.base.quadcopter import Quadcopter
+from loyalwingmen.entities.quadcoters.quadcopter import Quadcopter
 from typing import Dict, List
 
 
@@ -36,8 +36,10 @@ class OffsetHandler:
     # ===========================================================================
 
     def on_episode_start(self):
+        # print("Offserts handler = on_episode_start")
         self.current_offsets: Offsets = self.calculate_invader_offsets_from_pursuers()
         self.last_offsets: Offsets = self.current_offsets
+        # print("offsets handler = started: ")
 
     def on_middle_step(self):
         self.update_offsets()

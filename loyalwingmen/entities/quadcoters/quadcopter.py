@@ -129,6 +129,7 @@ class Quadcopter:
         quadx.reset()
         quadx.set_mode(6)
 
+        # print(f"Lidar Radius: {lidar_radius}")
         return Quadcopter(
             simulation=simulation,
             quadx=quadx,

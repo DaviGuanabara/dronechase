@@ -26,21 +26,19 @@ from optuna.samplers import TPESampler
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
-
-from loyalwingmen.modules.environments_pyflyt.level3.pyflyt_level3_environment import (
+from loyalwingmen.environments.level3.pyflyt_level3_environment import (
     PyflytL3Enviroment as Level3,
 )
-from loyalwingmen.rl_tools.pipeline import (
+from loyalwingmen.rl_framework.agents.policies.ppo_policies import (
+    LidarInertialActionExtractor2,
+)
+from loyalwingmen.rl_framework.utils.pipeline import (
     ReinforcementLearningPipeline,
     callbacklist,
     CallbackType,
 )
-from loyalwingmen.rl_tools.directory_manager import DirectoryManager
+from loyalwingmen.rl_framework.utils.directory_manager import DirectoryManager
 
-from loyalwingmen.rl_tools.policies.ppo_policies import (
-    LidarInertialActionExtractor,
-    LidarInertialActionExtractor2,
-)
 import torch
 
 
@@ -199,9 +197,9 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 500_000
+    n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level3_{n_timesteps_in_millions:.2f}M_14.11.2023_office_pc"
+    study_name = f"level3_{n_timesteps_in_millions:.2f}M_06_12.2023"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 

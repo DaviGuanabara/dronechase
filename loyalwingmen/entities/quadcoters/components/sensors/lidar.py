@@ -267,6 +267,8 @@ class LiDAR(Sensor):
         it receives the inertial data from the publisher and stores it in the buffer
         the publisher is triggered when imu sensor is updated, in the quacopter class
         """
+
+        # print("buffer_inertial_data", message, publisher_id)
         if "termination" in message:
             self.buffer_manager.clear_buffer_data(publisher_id)
 
@@ -354,7 +356,9 @@ class LiDAR(Sensor):
 
     def debug_sphere(self):
         current_position = self.parent_inertia["position"]
-        print(f"Sphere_Shape = {self.sphere.shape} \n Sphere \n {self.sphere}")
+        print(
+            f"Sphere_Shape = {self.sphere.shape}, radius {self.radius} \n Sphere \n {self.sphere}"
+        )
         for theta_point in range(len(self.sphere[Channels.DISTANCE_CHANNEL.value])):
             for phi_point in range(
                 len(self.sphere[Channels.DISTANCE_CHANNEL.value][theta_point])

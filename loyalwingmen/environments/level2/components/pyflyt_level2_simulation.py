@@ -7,7 +7,8 @@ import pybullet as p
 import pybullet_data
 from pybullet_utils import bullet_client
 
-from loyalwingmen.modules.quadcoters.components.base.quadcopter import Quadcopter
+
+from loyalwingmen.entities.quadcoters.quadcopter import Quadcopter
 
 
 class L2AviarySimulation(bullet_client.BulletClient):
@@ -96,7 +97,7 @@ class L2AviarySimulation(bullet_client.BulletClient):
                     drone.update_imu()
                     drone.update_control()
                     drone.update_physics()
-                    
+
             else:
                 print("No drones in the simulation.")
 

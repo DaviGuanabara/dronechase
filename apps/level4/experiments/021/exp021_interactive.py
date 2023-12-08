@@ -29,9 +29,9 @@ observation, info = env.reset()
 data = {}
 reward_acc = 0
 for _ in range(50_000):
-    # action = keyboard_listener.get_action()
+    action = keyboard_listener.get_action()
     # action = np.array(np.random.rand(4))
-    action = np.array([0, 0, 0, 0.5])
+    # action = np.array([0, 0, 0, 0.5])
     observation, reward, terminated, truncated, info = env.step(action)
     # print(observation["gun"])
     # log(f"reward:{reward:.2f}")

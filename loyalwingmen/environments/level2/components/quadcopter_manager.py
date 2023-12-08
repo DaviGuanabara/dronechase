@@ -3,10 +3,7 @@ import os, sys
 import numpy as np
 from enum import Enum
 from typing import Optional, Union, NamedTuple
-from loyalwingmen.modules.quadcoters.components.base.quadcopter import (
-    Quadcopter,
-    QuadcopterType,
-)
+from loyalwingmen.entities.quadcoters.quadcopter import Quadcopter, EntityType
 from .pyflyt_level2_simulation import (
     L2AviarySimulation as AviaryL2,
 )
@@ -15,12 +12,12 @@ from .pyflyt_level2_simulation import (
 class QuadcopterBlueprint(NamedTuple):
     position: np.ndarray
     orientation: np.ndarray
-    quadcopter_type: QuadcopterType
+    quadcopter_type: EntityType
     quadcopter_name: str = "no_name"
 
 
 class QuadcopterManager:
-    def __init__(self, simulation: AviaryL2, debug_on:bool = False) -> None:
+    def __init__(self, simulation: AviaryL2, debug_on: bool = False) -> None:
         self.simulation = simulation
         self.blueprints: list[QuadcopterBlueprint] = []
         self.debug_on = debug_on
@@ -37,11 +34,18 @@ class QuadcopterManager:
 
         initial_len = len(self.simulation.drones)
         for i in range(num_drones):
-            drone = Quadcopter.spawn_loyalwingman(self.simulation, position[i], name, debug_on=self.debug_on, lidar_on=True)
+            drone = Quadcopter.spawn_loyalwingman(
+                self.simulation,
+                position[i],
+                name,
+                debug_on=self.debug_on,
+                lidar_on=True,
+                lidar_radius=20,  # Esse é o dobro do dome radius do Level2, possibilitando o agente ver o invasor de qualquer lugar
+            )
             drone.update_imu()
             drone.set_mode(6)
             data = QuadcopterBlueprint(
-                position[i], np.zeros(3), QuadcopterType.LOYALWINGMAN
+                position[i], np.zeros(3), EntityType.LOYALWINGMAN
             )
             self.blueprints.append(data)
             self.simulation.drones.append(drone)
@@ -65,7 +69,7 @@ class QuadcopterManager:
                 np.array([positions[i][0], positions[i][1], 0, positions[i][2]])
             )
             data = QuadcopterBlueprint(
-                positions[i], np.zeros(3), QuadcopterType.LOITERINGMUNITION
+                positions[i], np.zeros(3), EntityType.LOITERINGMUNITION
             )
             self.blueprints.append(data)
             self.simulation.drones.append(drone)
@@ -76,7 +80,7 @@ class QuadcopterManager:
         return [
             drone
             for drone in drones
-            if drone.quadcopter_type == QuadcopterType.LOITERINGMUNITION
+            if drone.quadcopter_type == EntityType.LOITERINGMUNITION
         ]
 
     def get_pursuers(self) -> "list[Quadcopter]":
@@ -84,7 +88,7 @@ class QuadcopterManager:
         return [
             drone
             for drone in drones
-            if drone.quadcopter_type == QuadcopterType.LOYALWINGMAN
+            if drone.quadcopter_type == EntityType.LOYALWINGMAN
         ]
 
     def spawn_quadcopters_from_blueprints(self):
@@ -92,13 +96,13 @@ class QuadcopterManager:
         loyalwingman_positions = [
             blueprint.position
             for blueprint in self.blueprints
-            if blueprint.quadcopter_type == QuadcopterType.LOYALWINGMAN
+            if blueprint.quadcopter_type == EntityType.LOYALWINGMAN
         ]
 
         loiteringmunition_positions = [
             blueprint.position
             for blueprint in self.blueprints
-            if blueprint.quadcopter_type == QuadcopterType.LOITERINGMUNITION
+            if blueprint.quadcopter_type == EntityType.LOITERINGMUNITION
         ]
 
         # Cria os quadcopters de uma vez
