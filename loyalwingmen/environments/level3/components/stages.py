@@ -18,6 +18,7 @@ class L3Stage1(Stage):
         debug_on: bool = False,
     ):
         self.dome_radius = dome_radius
+
         self.quadcopter_manager = quadcopter_manager
         self.debug_on = debug_on
 
@@ -32,16 +33,16 @@ class L3Stage1(Stage):
             subscriber=self._subscriber_simulation_step,
         )
 
+        # print("dome_radius", dome_radius)
         print("L3Stage1 instatiated")
+        # print("dome_radius", dome_radius)
 
     def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
         self.current_step = message.get("step", 0)
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
-        self.NUM_PURSUERS = (
-            2  # (1 for the RL Agent, and the other to simulate the support pursuer)
-        )
+        self.NUM_PURSUERS = 2  # 1  # 2  # (1 for the RL Agent, and the other to simulate the support pursuer)
         self.NUM_INVADERS = 1
 
         self.MAX_REWARD = 1000
@@ -60,6 +61,7 @@ class L3Stage1(Stage):
 
     def init_globals(self):
         self.current_step = 0
+
         # self.MAX_BUILDING_LIFE = 3
         # self.building_life = self.MAX_BUILDING_LIFE
 
@@ -195,14 +197,15 @@ class L3Stage1(Stage):
         pursuers_exploded: int = 0,
         gun_available: bool = True,
     ):
-        # Initialize reward components
         score, bonus, penalty = 0, 0, 0
 
         # Calculate the current and last closest distances
-        current_closest_distance: int = (
+
+        current_closest_distance = (
             self.offset_handler.current_closest_pursuer_to_invader_distance
         )
-        last_closest_distance: int = (
+
+        last_closest_distance = (
             self.offset_handler.last_closest_pursuer_to_invader_distance
         )
 
@@ -212,12 +215,22 @@ class L3Stage1(Stage):
         score = -current_closest_distance if gun_available else current_closest_distance
 
         # bonification for getting closer to the invader
-        if gun_available and current_closest_distance < last_closest_distance:
-            bonus += last_closest_distance - current_closest_distance
+        # 0.01 works like an threshold to avoid moviment oscilation trigger the bonus
+        # I identified oscilations at maximun about 0.003. So, 0.01 is a good value (1/20 the dimension of the quadcopter that is already small).
+        if gun_available and 0.01 < last_closest_distance - current_closest_distance:
+            rl_agent_quadcopter = self.quadcopter_manager.get_all_pursuers()[0]
+            velocity = rl_agent_quadcopter.inertial_data["velocity"]
+            bonus += 10 * np.linalg.norm(velocity)
+            # print("BONUS")
 
         # bonification for getting far from the invader
-        if not gun_available and current_closest_distance < last_closest_distance:
-            bonus += -(last_closest_distance - current_closest_distance)
+        if (
+            not gun_available
+            and 0.01 > last_closest_distance - current_closest_distance
+        ):
+            rl_agent_quadcopter = self.quadcopter_manager.get_all_pursuers()[0]
+            velocity = rl_agent_quadcopter.inertial_data["velocity"]
+            bonus += np.linalg.norm(velocity)
 
         bonus += self.MAX_REWARD * successful_shots
         penalty += self.MAX_REWARD * pursuers_exploded

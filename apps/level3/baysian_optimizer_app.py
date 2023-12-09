@@ -60,7 +60,11 @@ def objective(
     log_suggested_parameters(suggestions)
 
     avg_score, std_deviation, n_episodes = rl_pipeline(
-        suggestions, n_timesteps=n_timesteps, models_dir=models_dir, logs_dir=logs_dir
+        suggestions,
+        n_timesteps=n_timesteps,
+        models_dir=models_dir,
+        logs_dir=logs_dir,
+        n_eval_episodes=10,
     )
     logging.info(f"Avg score: {avg_score}")
 
@@ -158,6 +162,7 @@ def rl_pipeline(
         policy_kwargs=policy_kwargs,
         learning_rate=suggestions["learning_rate"],
         batch_size=suggestions["batch_size"],
+        tensorboard_log=specific_log_folder,
     )
 
     logging.info(model.policy)
@@ -197,9 +202,9 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 2_000_000
+    n_timesteps = 1_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level3_{n_timesteps_in_millions:.2f}M_06_12.2023"
+    study_name = f"level3_{n_timesteps_in_millions:.2f}M_09_12.2023_reward_fixed"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 

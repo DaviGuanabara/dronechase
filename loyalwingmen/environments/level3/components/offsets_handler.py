@@ -28,6 +28,9 @@ class OffsetHandler:
         self.quadcopter_manager = quadcopter_manager
         self.dome_radius = dome_radius
 
+        self.current_moving_average = MovingAverage(10)
+        self.last_moving_average = MovingAverage(10)
+
         # self.current_offsets: Offsets = self.calculate_invader_offsets_from_pursuers()
         # self.last_offsets: Offsets = self.filter_last_offsets(self.current_offsets, self.last_offsets)
 
@@ -39,6 +42,9 @@ class OffsetHandler:
         # print("Offserts handler = on_episode_start")
         self.current_offsets: Offsets = self.calculate_invader_offsets_from_pursuers()
         self.last_offsets: Offsets = self.current_offsets
+
+        self.current_moving_average = MovingAverage(10)
+        self.last_moving_average = MovingAverage(10)
         # print("offsets handler = started: ")
 
     def on_middle_step(self):
@@ -161,24 +167,37 @@ class OffsetHandler:
     # Helpers
     # ===========================================================================
 
+    """
+    This code were developed with an assumption that there is only one pursuer. But, it is not the case anymore.
+    It will be two or more pursuers. The first one is the RL Agent, and the others are the support pursuers, running behavior tree. 
+    As the time is short, I will make only small changes, enough to run the new requirements.
+    """
+
+    def compute_closest_rl_agent_distance(self, distances) -> np.ndarray:
+        # print("distances:", distances[0])
+        return np.min(distances[0], axis=0)
+
     @property
     def current_pursuer_velocities(self):
         return self.current_offsets.pursuer_velocities
 
     @property
-    def current_closest_pursuer_to_invader_distance(self) -> int:
+    def current_closest_pursuer_to_invader_distance(self) -> float:
+        """se tiver mais de um pursuer, essa lógica quebra"""
+        # print(
+        #    "closest pursuers distance:",
+        #    self.compute_closest_rl_agent_distance(self.current_offsets.distances),
+        # )
         return np.sum(
-            self.compute_closest_pursuer_distance(self.current_offsets.distances)
+            self.compute_closest_rl_agent_distance(self.current_offsets.distances)
         )
 
     @property
     def last_closest_pursuer_to_invader_distance(self) -> int:
+        """se tiver mais de um pursuer, essa lógica quebra"""
         return np.sum(
-            self.compute_closest_pursuer_distance(self.last_offsets.distances)
+            self.compute_closest_rl_agent_distance(self.last_offsets.distances)
         )
-
-    def compute_closest_pursuer_distance(self, distances) -> np.ndarray:
-        return np.min(distances, axis=0)
 
     # def identify_captured_invaders(self) -> list:
     #    capture_mask = self.current_offsets.distances < self.CAPTURE_DISTANCE
@@ -267,3 +286,19 @@ class OffsetHandler:
         return list(
             np.array(self.current_offsets.invader_ids)[invader_at_ground_bool_array]
         )
+
+
+class MovingAverage:
+    def __init__(self, window_size):
+        self.window_size = window_size
+        self.values = []
+
+    def add_value(self, value):
+        self.values.append(value)
+        if len(self.values) > self.window_size:
+            self.values.pop(0)
+
+    def get_average(self):
+        if not self.values:
+            return 0
+        return sum(self.values) / len(self.values)

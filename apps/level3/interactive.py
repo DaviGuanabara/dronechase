@@ -27,15 +27,21 @@ keyboard_listener = KeyboardListener(env.get_keymap())
 
 observation, info = env.reset()
 data = {}
+reward_acc = 0
 for _ in range(50_000):
     action = keyboard_listener.get_action()
     # action = np.array(np.random.rand(4))
     # action = np.array([0, 0, 0, 0.5])
     observation, reward, terminated, truncated, info = env.step(action)
     # print(observation["gun"])
-    print(f"reward:{reward:.2f}, gun observation:{observation['gun']}")
+    # print(f"reward:{reward:.2f}, gun observation:{observation['gun']}")
+    # reward_acc += reward
+    # print(f"reward:{reward:.2f}, reward_acc:{reward_acc}")
     # log(f"reward:{reward:.2f}")
+
+    print(f"action:{action}")
     time.sleep(0.01)
 
     if terminated:
         observation, info = env.reset()
+        reward_acc = 0
