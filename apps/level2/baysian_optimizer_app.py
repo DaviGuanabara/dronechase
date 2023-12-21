@@ -44,6 +44,8 @@ from loyalwingmen.rl_framework.agents.policies.ppo_policies import (
     LidarInertialActionExtractor2,
 )
 
+from stable_baselines3.common.logger import configure
+import torch
 
 warnings.filterwarnings("ignore", category=UserWarning)
 logging.basicConfig(
@@ -142,9 +144,12 @@ def rl_pipeline(
         debug=True,
     )
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy_kwargs = dict(
         features_extractor_class=LidarInertialActionExtractor2,
-        features_extractor_kwargs=dict(features_dim=suggestions["features_dim"]),
+        features_extractor_kwargs=dict(
+            features_dim=suggestions["features_dim"], device=device
+        ),
         net_arch=dict(pi=hiddens, vf=hiddens),
     )
 
@@ -152,14 +157,22 @@ def rl_pipeline(
         "MultiInputPolicy",
         vectorized_environment,
         verbose=0,
-        device="cuda",
+        device=device,
         policy_kwargs=policy_kwargs,
         learning_rate=suggestions["learning_rate"],
         batch_size=suggestions["batch_size"],
+        tensorboard_log=specific_log_folder,
     )
 
+    new_logger = configure(specific_log_folder, ["csv", "tensorboard"])
+    model.set_logger(new_logger)
+
     logging.info(model.policy)
-    model.learn(total_timesteps=n_timesteps, callback=callback_list)
+    model.learn(
+        total_timesteps=n_timesteps,
+        callback=callback_list,
+        tb_log_name="stage1_first_run",
+    )
 
     avg_reward, std_dev, num_episodes = ReinforcementLearningPipeline.evaluate(
         model, vectorized_environment, n_eval_episodes=n_eval_episodes
@@ -195,9 +208,9 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 2_000_000
+    n_timesteps = 1_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level2_{n_timesteps_in_millions:.2f}M_03.12.2023_baysian"
+    study_name = f"20_12.2023_level3_{n_timesteps_in_millions:.2f}M_v1_office_pc"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 

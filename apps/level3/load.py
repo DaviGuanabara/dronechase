@@ -9,6 +9,7 @@ from loyalwingmen.environments.level3.pyflyt_level3_environment import (
 
 import cProfile
 import pstats
+from pathlib import Path
 
 """
 [ ] - Aumentar o número de testes para 10 ou mais. Pois com somente 3, a sorte dá uma grande influência no resultado.
@@ -18,10 +19,12 @@ import pstats
 
 
 def setup_environment():
-    # path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output_level3\\baysian_optimizer_app\\level3_2.00M_06_12.2023\\models_dir\\h[512, 128, 512]-f15-lr0.0001\\mPPO-r-230.39683532714844-sd573.9155883789062.zip"
-    # path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output_level3\\baysian_optimizer_app\\level3_2.00M_06_12.2023\\models_dir\\h[512, 128, 512]-f15-lr0.0001\\mPPO-r-262.65863037109375-sd636.4769287109375.zip"
-    # path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output_level3\\baysian_optimizer_app\\level3_2.00M_06_12.2023\\models_dir\\h[128, 128, 128]-f15-lr0.001\\mPPO-r-701.0654907226562-sd83.1894760131836.zip"
-    path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output_level3\\baysian_optimizer_app\\level3_1.00M_08_12.2023_reward_fixed\\models_dir\\h[128, 256, 512]-f15-lr1e-05\\mPPO-r-768.593505859375-sd684.119140625.zip"
+    # path = "apps\\level3\\from level 2\\mPPO-r4985.2099609375-sd1149.3851318359375.zip"
+    path = str(
+        Path(
+            "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output_level3\\baysian_optimizer_app_v2\\19_12.2023_level3_2.00M\\models_dir\\h[512, 256, 128]_f15_lr0.01\\PPO_t4_r759.74.zip"
+        )
+    )
     env = Level3(GUI=True, rl_frequency=15)
     model = PPO.load(path)
     observation, _ = env.reset(0)
@@ -36,9 +39,11 @@ def on_avaluation_step(env: Level3, model, observation):
 
         # logging.debug(f"(main) reward: {reward}")
         reward_acc += reward
-        print(
-            f"reward:{reward:.2f} - reward_acc:{reward_acc}"
-        )  # - observation:{observation}")
+        # print(
+        #    f"reward:{reward:.2f} - reward_acc:{reward_acc} observation:{observation}"
+        # )
+
+        print(f"reward:{reward:.2f} - reward_acc:{reward_acc}")
         # print(action)
 
         if terminated:

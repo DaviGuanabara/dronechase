@@ -235,7 +235,7 @@ class ReinforcementLearningPipeline:
     def gen_specific_folder_path(
         hidden_layers: List[int], rl_frequency: int, learning_rate: float, dir: str
     ) -> str:
-        model_folder_name = f"h{hidden_layers}-f{rl_frequency}-lr{learning_rate}"
+        model_folder_name = f"h{hidden_layers}_f{rl_frequency}_lr{learning_rate}"
         specific_dir = os.path.join(dir, model_folder_name)
         os.makedirs(specific_dir, exist_ok=True)
         return specific_dir
@@ -251,6 +251,7 @@ class ReinforcementLearningPipeline:
         reward_std_dev: float,
         models_dir: str,
         debug: bool = False,
+        trial_number: int = 0,
     ):
         specific_model_dir = ReinforcementLearningPipeline.gen_specific_folder_path(
             hidden_layers, rl_frequency, learning_rate, models_dir
@@ -258,14 +259,27 @@ class ReinforcementLearningPipeline:
 
         model_path = os.path.join(
             specific_model_dir,
-            f"m{model.__class__.__name__}-r{avg_reward}-sd{reward_std_dev}.zip",
+            f"t{trial_number}_{model.__class__.__name__}_r{avg_reward:.2f}.zip",  # _sd{reward_std_dev}.zip",
         )
         model.save(model_path)
         if debug:
             logging.info(f"Model saved at: {model_path}")
 
     @staticmethod
+    def save_evaluation(episode_rewards, specific_log_path):
+        filename = f"evaluation.csv"
+        full_path = os.path.join(specific_log_path, filename)
+
+        df = pd.DataFrame(
+            {"Episode": range(1, len(episode_rewards) + 1), "Reward": episode_rewards}
+        )
+
+        # Save the DataFrame to a CSV file
+        df.to_csv(full_path, index=False)
+
+    @staticmethod
     def extract_folder_info(folder_name: str):
+        raise Exception("I changed the folder name pattern. This method is not working")
         pattern = r"(?P<model_name>\w+)-h\[(?P<hidden_layers>[\d, ]+)\]-f(?P<rl_frequency>\d+)-lr(?P<learning_rate>\d+\.\d+e?[-+]?\d*)-r(?P<avg_reward>\d+\.?\d*)-sd(?P<reward_std_dev>\d+\.?\d*)"
         match = re.match(pattern, folder_name)
         print(match)
@@ -289,7 +303,8 @@ class ReinforcementLearningPipeline:
         env: VecEnv,
         n_eval_episodes: int = 100,
         deterministic: bool = True,
-    ) -> Tuple[float, float, int]:
+    ):
+        # -> Tuple[float, float, int, list]:
         """
         Evaluate the performance of a reinforcement learning model on a given environment.
 
@@ -322,7 +337,7 @@ class ReinforcementLearningPipeline:
         print(
             f"Average reward: {avg_reward:.2f} +/- {std_dev:.2f} over {n_eval_episodes} episodes"
         )
-        return avg_reward, std_dev, n_eval_episodes
+        return avg_reward, std_dev, n_eval_episodes, episode_rewards
 
     @staticmethod
     def evaluate_with_dynamic_episodes(
@@ -380,7 +395,7 @@ class ReinforcementLearningPipeline:
             # print("num_episodes:", num_episodes, "std_dev:", std_dev)
 
             # Verificar a convergência dentro da tolerância especificada
-            if abs(std_dev - target_std) < tolerance:
+            if abs(std_dev - target_std) < tolerance:  # type: ignore
                 print("Performance converged within tolerance.")
                 break
             else:

@@ -11,13 +11,31 @@ from typing import Dict, Optional
 
 
 class L3Stage1(Stage):
+
+    """
+    Level 3 P1 - Raio de nascimento dos perseguidores = 1, o que os deixa bem próximo do perseguidor.
+    Ele tem que aprender a ignorar o outro loyalwingman e focar no invasor.
+    Esse estágio é:
+    - 1 invasor
+    - 1 perseguidor Agente RL
+    - 1 perseguidor de suporte (aqui não faz nada. Está mais para estimular a rede, mostrando que ele existe)
+
+    - score = (
+            5 - current_closest_distance if gun_available else current_closest_distance
+        )
+
+
+    self.MAX_STEP = 400
+    self.dome_radius = 20
+    """
+
     def __init__(
         self,
         quadcopter_manager: QuadcopterManager,
         dome_radius: float,
         debug_on: bool = False,
     ):
-        self.dome_radius = dome_radius
+        self.dome_radius = dome_radius  # dome_radius
 
         self.quadcopter_manager = quadcopter_manager
         self.debug_on = debug_on
@@ -34,7 +52,8 @@ class L3Stage1(Stage):
         )
 
         # print("dome_radius", dome_radius)
-        print("L3Stage1 instatiated")
+        print("L3Stage1 - P1 - instatiated")
+
         # print("dome_radius", dome_radius)
 
     def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
@@ -42,7 +61,8 @@ class L3Stage1(Stage):
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
-        self.NUM_PURSUERS = 2  # 1  # 2  # (1 for the RL Agent, and the other to simulate the support pursuer)
+        print("NUM PURSUERS = 1. ONLY THE RL AGENT")
+        self.NUM_PURSUERS = 1  # 1  # 2  # (1 for the RL Agent, and the other to simulate the support pursuer)
         self.NUM_INVADERS = 1
 
         self.MAX_REWARD = 1000
@@ -121,11 +141,10 @@ class L3Stage1(Stage):
 
         successful_shots, pursuers_exploded = self.process_nearby_invaders()
         # self.process_invaders_in_origin()
-        gun_availability: bool = self.check_gun_availability()
 
-        reward = self.compute_reward(
-            successful_shots, pursuers_exploded, gun_availability
-        )
+        gun_state: np.ndarray = self.agent_gun_state()
+
+        reward = self.compute_reward(successful_shots, pursuers_exploded, gun_state)
 
         termination = self.compute_termination()
 
@@ -137,9 +156,9 @@ class L3Stage1(Stage):
 
         return reward, termination
 
-    def check_gun_availability(self) -> bool:
+    def agent_gun_state(self) -> np.ndarray:
         pursuer: Quadcopter = self.quadcopter_manager.get_all_pursuers()[0]
-        return pursuer.is_gun_available
+        return pursuer.gun_state
 
     def process_nearby_invaders(self):
         successful_shots = 0
@@ -183,6 +202,11 @@ class L3Stage1(Stage):
     def on_step_end(self):
         self.offset_handler.on_end_step()
 
+        if self.debug_on and self.current_step % 2 == 0:
+            pursuers = self.quadcopter_manager.get_all_pursuers()
+            for pursuer in pursuers:
+                pursuer.lidar.debug_sphere()
+
     @property
     def status(self):
         return self._stage_status
@@ -195,9 +219,12 @@ class L3Stage1(Stage):
         self,
         successful_shots: int = 0,
         pursuers_exploded: int = 0,
-        gun_available: bool = True,
+        gun_state: np.ndarray = np.array([1, 0, 1]),
     ):
         score, bonus, penalty = 0, 0, 0
+        munition = gun_state[0]
+        reload_progress = gun_state[1]
+        gun_available = gun_state[2]
 
         # Calculate the current and last closest distances
 
@@ -212,26 +239,22 @@ class L3Stage1(Stage):
         # =======================================================================
         # Calculate Base Score
         # =======================================================================
-        score = -current_closest_distance if gun_available else current_closest_distance
+
+        if gun_available:
+            score = -current_closest_distance
+
+        elif munition == 0:
+            score = -current_closest_distance
+
+        else:
+            # score = current_closest_distance * reload_progress
+            score = current_closest_distance * (2 * reload_progress - 1)
 
         # bonification for getting closer to the invader
         # 0.01 works like an threshold to avoid moviment oscilation trigger the bonus
         # I identified oscilations at maximun about 0.003. So, 0.01 is a good value (1/20 the dimension of the quadcopter that is already small).
-        if gun_available and 0.01 < last_closest_distance - current_closest_distance:
-            rl_agent_quadcopter = self.quadcopter_manager.get_all_pursuers()[0]
-            velocity = rl_agent_quadcopter.inertial_data["velocity"]
-            bonus += 10 * np.linalg.norm(velocity)
-            # print("BONUS")
-
-        # bonification for getting far from the invader
-        if (
-            not gun_available
-            and 0.01 > last_closest_distance - current_closest_distance
-        ):
-            rl_agent_quadcopter = self.quadcopter_manager.get_all_pursuers()[0]
-            velocity = rl_agent_quadcopter.inertial_data["velocity"]
-            bonus += np.linalg.norm(velocity)
-
+        if 0.01 < last_closest_distance - current_closest_distance and gun_available:
+            bonus += 10 * (last_closest_distance - current_closest_distance)
         bonus += self.MAX_REWARD * successful_shots
         penalty += self.MAX_REWARD * pursuers_exploded
 
@@ -296,7 +319,13 @@ class L3Stage1(Stage):
     # Others Implementations
     # ===============================================================================
 
-    def generate_positions(self, num_positions: int, r: float) -> np.ndarray:
+    def generate_positions(
+        self, num_positions: int, r: float, r_max: float = 0
+    ) -> np.ndarray:
+        if r > r_max:
+            r_max = r
+
+        radius = np.random.uniform(r, r_max, num_positions)
         # Random azimuthal angles limited to 0 to 2 * pi for x > 0
         thetas = np.random.uniform(0, 2 * np.pi, num_positions)
 
@@ -304,16 +333,16 @@ class L3Stage1(Stage):
         phis = np.random.uniform(0, np.pi / 2, num_positions)
 
         # Convert to Cartesian coordinates using broadcasting
-        xs = r * np.sin(phis) * np.cos(thetas)
-        ys = r * np.sin(phis) * np.sin(thetas)
-        zs = r * np.cos(phis)
+        xs = radius * np.sin(phis) * np.cos(thetas)
+        ys = radius * np.sin(phis) * np.sin(thetas)
+        zs = radius * np.cos(phis)
 
         return np.column_stack((xs, ys, zs))
 
     def replace_invaders(self):
         # self.quadcopter_manager.disarm_all()
         invaders = self.quadcopter_manager.get_all_invaders()
-        positions = self.generate_positions(len(invaders), 3)
+        positions = self.generate_positions(len(invaders), 2, 6)  # 6)
         self.quadcopter_manager.replace_quadcopters(invaders, positions)
 
     def replace_pursuers(self):
@@ -324,16 +353,25 @@ class L3Stage1(Stage):
 
     def spawn_invader_squad(self):
         # num_invaders = 2
-        positions = self.generate_positions(self.NUM_INVADERS, 3)  # /2
+        positions = self.generate_positions(self.NUM_INVADERS, 2)  # 6)  # /2
         self.quadcopter_manager.spawn_invader(positions, "invader")
 
     def spawn_pursuer_squad(self):
-        # num_pursuers = 1
+        """
+        Lidar radius deve ser 2 * dome_radius
+        """
+
         positions = self.generate_positions(self.NUM_PURSUERS, 1)
-        # print("Spawning pursuers, positions: ", positions)
+
         self.quadcopter_manager.spawn_pursuer(
-            positions, ["RL Agent", "supporter"], lidar_radius=self.dome_radius
+            positions,
+            ["RL Agent", "supporter"],
+            lidar_radius=2 * self.dome_radius,  # NÃO MEXER AQUI
         )
+
+        # pursuers = self.quadcopter_manager.get_all_pursuers()
+        # for pursuer in pursuers:
+        #    pursuer.lidar.debug = True
 
     def get_invaders_positions(self):
         invaders = self.quadcopter_manager.get_all_invaders()

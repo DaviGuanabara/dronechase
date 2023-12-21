@@ -65,6 +65,7 @@ def objective(
         models_dir=models_dir,
         logs_dir=logs_dir,
         n_eval_episodes=10,
+        trial_number=trial.number,
     )
     logging.info(f"Avg score: {avg_score}")
 
@@ -87,18 +88,22 @@ def suggest_parameters(trial: Trial) -> dict:
 
     n_hiddens = trial.suggest_int("n_hiddens", 3, 3)
     suggestions = {
-        f"hidden_{i}": trial.suggest_categorical(f"hiddens_{i}", [128, 256, 512])
+        f"hidden_{i}": trial.suggest_categorical(
+            f"hiddens_{i}", [128, 256, 512, 1024, 2048]
+        )
         for i in range(1, n_hiddens + 1)
     }
 
     # suggestions["rl_frequency"] = trial.suggest_categorical(
     #    "frequency", [1, 5, 10, 15, 30]
     # )
-    suggestions["learning_rate"] = 10 ** trial.suggest_int("exponent", -5, -3)
+    suggestions["learning_rate"] = 10 ** trial.suggest_int("exponent", -5, -2)
     suggestions["batch_size"] = trial.suggest_categorical(
-        "batch_size", [128, 256, 512, 1024]
+        "batch_size", [64, 128, 256, 512, 1024]
     )
-    suggestions["features_dim"] = trial.suggest_categorical("feature_dim", [512])
+    suggestions["features_dim"] = trial.suggest_categorical(
+        "feature_dim", [256, 512, 1024]
+    )
     return suggestions
 
 
@@ -115,6 +120,7 @@ def rl_pipeline(
     models_dir: str,
     logs_dir: str,
     n_eval_episodes: int = 3,
+    trial_number: int = 0,
 ) -> Tuple[float, float, float]:
     frequency = 15  # suggestions["rl_frequency"]
     learning_rate = suggestions["learning_rate"]
@@ -172,7 +178,14 @@ def rl_pipeline(
         model, vectorized_environment, n_eval_episodes=n_eval_episodes
     )
     ReinforcementLearningPipeline.save_model(
-        model, hiddens, frequency, learning_rate, avg_reward, std_dev, models_dir
+        model,
+        hiddens,
+        frequency,
+        learning_rate,
+        avg_reward,
+        std_dev,
+        models_dir,
+        trial_number=trial_number,
     )
 
     return avg_reward, std_dev, num_episodes
@@ -202,9 +215,9 @@ def directories(study_name: str):
 
 
 def main():
-    n_timesteps = 1_000_000
+    n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level3_{n_timesteps_in_millions:.2f}M_09_12.2023_reward_fixed"
+    study_name = f"17_12.2023_level3_{n_timesteps_in_millions:.2f}M_v1"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 

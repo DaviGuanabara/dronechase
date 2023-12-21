@@ -504,6 +504,6 @@ class Quadcopter:
         and not the parameters that are used to calculate them, like propeller radius, etc.
         """
         speed_modulator = 1
-        max_speed_kmh = 30
+        max_speed_kmh = 10
         KMH_TO_MS = 1000 / 3600
         return speed_modulator * max_speed_kmh * KMH_TO_MS
