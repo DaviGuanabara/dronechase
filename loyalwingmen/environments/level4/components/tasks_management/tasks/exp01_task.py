@@ -20,8 +20,8 @@ from ......entities.navigators.loyalwingman_navigator import LoyalWingmanBehavio
 """
 Level 4 - STATUS: IN PROGRESS
 TODO:
-    - [ ] Make a Finite Machine State to control Loitering Munitions
-    - [ ] Make a Behavior tree to control Loyal Wingmen
+    - [ x ] Make a Finite Machine State to control Loitering Munitions
+    - [ x ] Make a Behavior tree to control Loyal Wingmen
     - [ ] Make Building: a cube on origin that has life of 1.
         a. [ ] Penalize proportionally by distance of closest LM.
         b. [ ] Destroyed after 1 hit.
@@ -30,6 +30,12 @@ TODO:
             1. [ ] Initialization
             2. [ ] Reward
             3. [ ] Termination
+
+"""
+
+"""
+Exp02_Task is a task that uses the KamikazeNavigator to control the Loitering Munition and 
+uses Behavior tree to control ALL pursuer.
 
 """
 
@@ -69,6 +75,8 @@ class Exp01_Task(Task):
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
+        self.MAX_BUILDING_LIFE = 1
+
         self.NUM_PURSUERS = 1
         self.munition_per_defender = 20
         self.MAX_NUMBER_OF_ROUNDS = self.calculate_rounds(
@@ -78,36 +86,25 @@ class Exp01_Task(Task):
         self.NUM_INVADERS = self.MAX_NUMBER_OF_ROUNDS
         # self.NUM_INVADERS = 1
 
-        self.current_round = 1
         self.building_position = np.array([0, 0, 1])
 
         self.MAX_REWARD = 1000
-        self.PROXIMITY_THRESHOLD = 2
-        self.PROXIMITY_PENALTY = 1000
-        self.CAPTURE_DISTANCE = 0.2
 
         self.INVADER_EXPLOSION_RANGE = 0.2
         self.PURSUER_SHOOT_RANGE = 1
 
-        self.STEP_INCREMENT = 300
         self.MAX_STEP = 300  # 300 calls = 20 seconds for rl_frequency = 15
-        # STEP_PENALTY_SMOOTHING ensures that at the end of the episode the accumulated penalty is about MAX_REWARD
-        self.STEP_PENALTY_SMOOTHING = (
-            2 * self.MAX_REWARD / (self.MAX_STEP * (self.MAX_STEP + 1))
-        )
+        self.STEP_INCREMENT = 300  # Increment in time of each level
 
     def init_globals(self):
         self.current_step = 0
-        self.MAX_BUILDING_LIFE = 1
+        self.current_round = 1
+
         self.building_life = self.MAX_BUILDING_LIFE
 
         self.kills = 0
         self.deads = 0
         self.is_building_destroyed = False
-        # self.is_building_destroyed = False
-
-        # self.MAX_BUILDING_LIFE = 3
-        # self.building_life = self.MAX_BUILDING_LIFE
 
     # ===============================================================================
     # Rounds Management

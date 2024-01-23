@@ -32,7 +32,7 @@ class PyflytL2Enviroment(Env):
     ):
         """Initialize the environment."""
 
-        self.CATCH_DISTANCE = 0.2
+        self.CATCH_DISTANCE = 0.4  # 0.2
         self.MAX_REWARD = 1_000
 
         self.dome_radius = dome_radius
@@ -46,8 +46,28 @@ class PyflytL2Enviroment(Env):
 
         self.max_step_calls = 20 * rl_frequency
         self.step_calls = 0
-        self.quadcopter_manager.spawn_invader(1, np.array([[0, 0, 0]]), "invader")
-        self.quadcopter_manager.spawn_pursuer(1, np.array([[1, 1, 1]]), "pursuer")
+
+        # esse é o original, antes de 13/01
+        # self.quadcopter_manager.spawn_invader(1, np.array([[0, 0, 0]]), "invader")
+        # self.quadcopter_manager.spawn_pursuer(1, np.array([[1, 1, 1]]), "pursuer")
+
+        invader_position = np.random.uniform(-1, 1, 3)
+        # pursuer_position = np.random.uniform(-1, 1, 3)
+
+        print("invader position", invader_position)
+        print("pursuer_position", -invader_position)
+        self.quadcopter_manager.spawn_invader(
+            1, np.array([invader_position]), "invader"
+        )
+        self.quadcopter_manager.spawn_pursuer(
+            1, np.array([-invader_position]), "pursuer"
+        )
+
+        # Esse é
+
+        pursuer = self.quadcopter_manager.get_pursuers()[0]
+        pursuer.set_munition(0)
+
         self.show_name_on = GUI
 
         #### Create action and observation spaces ##################
@@ -73,8 +93,13 @@ class PyflytL2Enviroment(Env):
 
         ##Replace drones to start position.
         self.quadcopter_manager.replace_all_to_starting_position()
+        pursuer = self.quadcopter_manager.get_pursuers()[0]
+        pursuer.set_munition(0)
+
         self.update_last_distance()
         observation = self.compute_observation()
+        # print("dentro do environment")
+        # print(observation.keys())
         info = self.compute_info()
 
         return observation, info
@@ -114,6 +139,14 @@ class PyflytL2Enviroment(Env):
             invader.replace(position, attitude)
             motion_command = np.array([position[0], position[1], 0, position[2]])
             invader.set_setpoint(motion_command)
+            # print(
+            #    "replace invader",
+            #    "motion command:",
+            #    motion_command,
+            #    "setpoint",
+            #    invader.quadx.setpoint,
+            # )
+
             invader.update_imu()
             invader.update_control()
             invader.update_physics()
@@ -141,6 +174,9 @@ class PyflytL2Enviroment(Env):
 
         if distance > self.dome_radius:
             penalty += self.MAX_REWARD
+
+        # if self.step_calls > self.max_step_calls:
+        #    penalty += self.MAX_REWARD
 
         return score + bonus - penalty
 
@@ -251,6 +287,7 @@ class PyflytL2Enviroment(Env):
         )
 
         gun_state = pursuer.gun_state
+
         return {
             "lidar": lidar.astype(np.float32),
             "inertial_data": inertial_data.astype(np.float32),

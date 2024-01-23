@@ -231,6 +231,8 @@ class CustomActorCriticPolicyMixedObservation(ActorCriticPolicy):
 class LidarInertialActionExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict, features_dim: int = 256):
         # super(LidarInertialActionExtractor, self).__init__()
+        print("LidarInertialActionExtractor")
+        print("[Warning] Gun observation key is not processed here")
         super().__init__(observation_space, features_dim)
 
         lidar = observation_space["lidar"]
@@ -336,6 +338,7 @@ class LidarInertialActionExtractor2(BaseFeaturesExtractor):
     def __init__(
         self, observation_space: gym.spaces.Dict, features_dim: int = 256, device="cpu"
     ):
+        print("LidarInertialActionExtractor2")
         # super(LidarInertialActionExtractor, self).__init__()
         super().__init__(observation_space, features_dim)
         # self.device = torch.get_device()
@@ -378,6 +381,275 @@ class LidarInertialActionExtractor2(BaseFeaturesExtractor):
             )
 
         else:  # len(space.shape) == 1:  # Tuple observation
+            return nn.Sequential(
+                # nn.Linear(space.shape[0], space.shape[0]),
+                nn.Linear(space.shape[0], 128),
+                nn.ReLU(),
+                nn.Linear(128, 128),
+                nn.ReLU(),
+                nn.Linear(128, 128),
+                nn.ReLU(),
+            )
+
+    def adjust_feature_extractor(
+        self, raw_extractor, space
+    ) -> Tuple[nn.Sequential, int]:
+        # Compute shape by doing one forward pass
+        with torch.no_grad():
+            sample_input = torch.rand(1, *space.shape)
+            n_flatten = raw_extractor(sample_input).shape[1]
+
+        return raw_extractor, n_flatten
+
+    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
+        features = []
+
+        for key, observation in observations.items():
+            # print(f"Device of {key} tensor:", observation.device)
+            if key in self.feature_extractors:
+                # print(key)
+
+                features.append(self.feature_extractors[key](observation))
+                # print("feature appended")
+                # features.append(self.feature_extractors[key](observation))
+
+        concatenated_features = torch.cat(features, dim=1)
+        return self.final_layer(concatenated_features)
+
+
+class LidarInertialActionExtractor3(BaseFeaturesExtractor):
+    def __init__(
+        self, observation_space: gym.spaces.Dict, features_dim: int = 256, device="cpu"
+    ):
+        # super(LidarInertialActionExtractor, self).__init__()
+        print("LidarInertialActionExtractor3")
+        super().__init__(observation_space, features_dim)
+        # self.device = torch.get_device()
+
+        self.feature_extractors = {}
+        total_flatten_dim = 0
+        for key, space in observation_space.spaces.items():
+            raw_extractor = self._create_feature_extractor(space)
+            extractor, n_flatten = self.adjust_feature_extractor(raw_extractor, space)
+            extractor.to(device)
+            self.feature_extractors[key] = extractor
+            total_flatten_dim += n_flatten
+
+        # Concatenate both feature extractors and pass through a linear layer
+        self.final_layer = nn.Sequential(
+            nn.Linear(total_flatten_dim, features_dim), nn.ReLU()
+        )
+
+    def _create_feature_extractor(self, space) -> nn.Sequential:
+        # Create appropriate feature extractor based on the space type
+        # if not isinstance(space, gym.spaces.Box):
+        #    print(f"value error {space}")
+        #    raise ValueError("Unsupported space type")
+
+        if len(space.shape) == 3:  # Matrix observation (e.g., image, Lidar)
+            return nn.Sequential(
+                nn.Conv2d(
+                    in_channels=space.shape[0],
+                    out_channels=32,
+                    kernel_size=4,
+                    stride=4,
+                    padding=0,
+                ),
+                nn.ReLU(),
+                nn.Conv2d(
+                    in_channels=32, out_channels=64, kernel_size=2, stride=2, padding=0
+                ),
+                nn.ReLU(),
+                nn.Flatten(),
+            )
+
+        else:  # len(space.shape) == 1:  # Tuple observation
+            return nn.Sequential(
+                nn.Linear(space.shape[0], space.shape[0]),
+                # nn.Linear(space.shape[0], 128),
+                # nn.ReLU(),
+                # nn.Linear(128, 128),
+                # nn.ReLU(),
+                # nn.Linear(128, 128),
+                # nn.ReLU(),
+            )
+
+    def adjust_feature_extractor(
+        self, raw_extractor, space
+    ) -> Tuple[nn.Sequential, int]:
+        # Compute shape by doing one forward pass
+        with torch.no_grad():
+            sample_input = torch.rand(1, *space.shape)
+            n_flatten = raw_extractor(sample_input).shape[1]
+
+        return raw_extractor, n_flatten
+
+    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
+        features = []
+
+        for key, observation in observations.items():
+            # print(f"Device of {key} tensor:", observation.device)
+            if key in self.feature_extractors:
+                # print(key)
+
+                features.append(self.feature_extractors[key](observation))
+                # print("feature appended")
+                # features.append(self.feature_extractors[key](observation))
+
+        concatenated_features = torch.cat(features, dim=1)
+        return self.final_layer(concatenated_features)
+
+
+class LidarInertialActionExtractor2MODIFIED(BaseFeaturesExtractor):
+    def __init__(
+        self, observation_space: gym.spaces.Dict, features_dim: int = 256, device="cpu"
+    ):
+        print("LidarInertialActionExtractor2MODIFIED")
+        # super(LidarInertialActionExtractor, self).__init__()
+        super().__init__(observation_space, features_dim)
+        # self.device = torch.get_device()
+
+        self.feature_extractors = {}
+        total_flatten_dim = 0
+        for key, space in observation_space.spaces.items():
+            raw_extractor = self._create_feature_extractor(space, key)
+            extractor, n_flatten = self.adjust_feature_extractor(raw_extractor, space)
+            extractor.to(device)
+            self.feature_extractors[key] = extractor
+            total_flatten_dim += n_flatten
+
+        print("feature extractors:", self.feature_extractors)
+        # Concatenate both feature extractors and pass through a linear layer
+        self.final_layer = nn.Sequential(
+            nn.Linear(total_flatten_dim, features_dim), nn.ReLU()
+        )
+
+    def _create_feature_extractor(self, space, key) -> nn.Sequential:
+        # Create appropriate feature extractor based on the space type
+        # if not isinstance(space, gym.spaces.Box):
+        #    print(f"value error {space}")
+        #    raise ValueError("Unsupported space type")
+
+        if len(space.shape) == 3:  # Matrix observation (e.g., image, Lidar)
+            return nn.Sequential(
+                nn.Conv2d(
+                    in_channels=space.shape[0],
+                    out_channels=32,
+                    kernel_size=4,
+                    stride=4,
+                    padding=0,
+                ),
+                nn.ReLU(),
+                nn.Conv2d(
+                    in_channels=32, out_channels=64, kernel_size=2, stride=2, padding=0
+                ),
+                nn.ReLU(),
+                nn.Flatten(),
+            )
+
+        else:  # len(space.shape) == 1:  # Tuple observation
+            # if key == "gun":
+            #    return nn.Sequential(nn.Linear(space.shape[0], space.shape[0]))
+
+            return nn.Sequential(
+                # nn.Linear(space.shape[0], space.shape[0]),
+                nn.Linear(space.shape[0], 128),
+                nn.ReLU(),
+                nn.Linear(128, 128),
+                nn.ReLU(),
+                nn.Linear(128, 128),
+                nn.ReLU(),
+            )
+
+    def adjust_feature_extractor(
+        self, raw_extractor, space
+    ) -> Tuple[nn.Sequential, int]:
+        # Compute shape by doing one forward pass
+        with torch.no_grad():
+            sample_input = torch.rand(1, *space.shape)
+            n_flatten = raw_extractor(sample_input).shape[1]
+
+        return raw_extractor, n_flatten
+
+    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
+        features = []
+
+        for key, observation in observations.items():
+            # print(f"Device of {key} tensor:", observation.device)
+            if key in self.feature_extractors:
+                # print(key)
+
+                features.append(self.feature_extractors[key](observation))
+                # print("feature appended")
+                # features.append(self.feature_extractors[key](observation))
+
+        concatenated_features = torch.cat(features, dim=1)
+        return self.final_layer(concatenated_features)
+
+
+class LidarInertialActionExtractor2MODIFIED_V2(BaseFeaturesExtractor):
+    def __init__(
+        self, observation_space: gym.spaces.Dict, features_dim: int = 256, device="cpu"
+    ):
+        print("LidarInertialActionExtractor2MODIFIED_V2")
+        # super(LidarInertialActionExtractor, self).__init__()
+        super().__init__(observation_space, features_dim)
+        # self.device = torch.get_device()
+
+        self.feature_extractors = {}
+        total_flatten_dim = 0
+        for key, space in observation_space.spaces.items():
+            raw_extractor = self._create_feature_extractor(space, key)
+            extractor, n_flatten = self.adjust_feature_extractor(raw_extractor, space)
+            extractor.to(device)
+            self.feature_extractors[key] = extractor
+            total_flatten_dim += n_flatten
+
+        print(
+            "LidarInertialActionExtractor2MODIFIED_V2 - feature extractors:",
+            self.feature_extractors,
+        )
+        # Concatenate both feature extractors and pass through a linear layer
+        self.final_layer = nn.Sequential(
+            nn.Linear(total_flatten_dim, features_dim), nn.ReLU()
+        )
+
+    def _create_feature_extractor(self, space, key) -> nn.Sequential:
+        # Create appropriate feature extractor based on the space type
+        # if not isinstance(space, gym.spaces.Box):
+        #    print(f"value error {space}")
+        #    raise ValueError("Unsupported space type")
+
+        if len(space.shape) == 3:  # Matrix observation (e.g., image, Lidar)
+            return nn.Sequential(
+                nn.Conv2d(
+                    in_channels=space.shape[0],
+                    out_channels=32,
+                    kernel_size=4,
+                    stride=4,
+                    padding=0,
+                ),
+                nn.ReLU(),
+                nn.Conv2d(
+                    in_channels=32, out_channels=64, kernel_size=2, stride=2, padding=0
+                ),
+                nn.ReLU(),
+                nn.Flatten(),
+            )
+
+        else:  # len(space.shape) == 1:  # Tuple observation
+            if key == "gun":
+                return nn.Sequential(
+                    nn.Linear(in_features=space.shape[0], out_features=16, bias=True),
+                    nn.ReLU(),
+                )  # nn.Sequential(nn.Linear(space.shape[0], space.shape[0]))
+
+            if key == "last_action":
+                return nn.Sequential(
+                    nn.Linear(in_features=space.shape[0], out_features=32, bias=True),
+                    nn.ReLU(),
+                )
+
             return nn.Sequential(
                 # nn.Linear(space.shape[0], space.shape[0]),
                 nn.Linear(space.shape[0], 128),

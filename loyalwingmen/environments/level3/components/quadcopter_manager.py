@@ -154,6 +154,12 @@ class QuadcopterManager:
     def shoot_by_ids(self, from_id: int, target_id: int):
         from_quadcopter = self.drone_registry[from_id]
         # print(f"Quadcopter can fire ? {from_quadcopter.gun.can_fire()} - Gun Step: {from_quadcopter.gun.current_step} - lidar step:{from_quadcopter.lidar.current_step}")
+
+        if from_quadcopter.gun.munition == 0:
+            print("LW suicided to kill LM.")
+            self.disarm_by_ids([target_id])
+            return True
+
         if shot_successful := from_quadcopter.gun.shoot():
             # print("shoot successful")
             self.disarm_by_ids([target_id])

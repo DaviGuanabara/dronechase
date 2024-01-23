@@ -248,8 +248,8 @@ class Quadcopter:
         self.lidar.update_data()
         lidar_data = self.lidar.read_data()
         self._update_flight_state(lidar_data)
-        if self.debug_on:
-            self.lidar.debug_sphere()
+        # if self.debug_on:
+        #    self.lidar.debug_sphere()
         # Note: We don't publish the flight state here
 
     @property

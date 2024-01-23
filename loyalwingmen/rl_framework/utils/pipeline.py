@@ -31,14 +31,21 @@ from pprint import pprint
 class ReinforcementLearningPipeline:
     @staticmethod
     def create_vectorized_environment(
-        environment, env_kwargs: dict, n_envs: int = os.cpu_count() or 1
+        environment, env_kwargs: dict, n_envs: int = os.cpu_count() or 1, GUI=False
     ) -> VecMonitor:
-        env_args = set(
-            inspect.signature(environment).parameters.keys()
-        )  # Get the valid argument names of the function
+        # env_args = set(
+        #    inspect.signature(environment).parameters.keys()
+        # )  # Get the valid argument names of the function
+        n_envs = n_envs if not GUI else 1
+        print("n_envs:", n_envs)
+        env_kwargs["GUI"] = GUI
+        env_args = ["dome_radius", "rl_frequency", "GUI"]
+        print("env_args", env_args)
         valid_env_kwargs = {
             key: value for key, value in env_kwargs.items() if key in env_args
         }
+
+        print(env_kwargs)
 
         print("Valid environment kwargs:")
         pprint(valid_env_kwargs)
@@ -56,6 +63,7 @@ class ReinforcementLearningPipeline:
         callbacks_to_include: List[CallbackType],
         n_eval_episodes: int = 10,
         debug: bool = False,
+        steps=1_000_000,
     ):
         if callbacks_to_include is None:
             callbacks_to_include = [
@@ -63,7 +71,7 @@ class ReinforcementLearningPipeline:
                 CallbackType.CHECKPOINT,
                 CallbackType.PROGRESSBAR,
             ]
-        save_freq = 100_000
+        save_freq = int(steps / 10)
         return callbacklist(
             vectorized_environment,
             log_path=log_dir,

@@ -14,8 +14,8 @@ sys.path.append(grand_parent_directory)
 from stable_baselines3.common.env_checker import check_env
 
 from loyalwingmen.environments.utils.keyboard_listener import KeyboardListener
-from loyalwingmen.environments.level2.pyflyt_level2_environment import (
-    PyflytL2Enviroment as Level2,
+from loyalwingmen.environments.level2.pyflyt_level2_environment_modified_v2 import (
+    PyflytL2EnviromentModifiedV2 as Level2,
 )
 
 

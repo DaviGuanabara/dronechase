@@ -14,8 +14,8 @@ from datetime import datetime
 import os
 from stable_baselines3 import PPO
 
-from loyalwingmen.environments.level3.pyflyt_level3_environment import (
-    PyflytL3Enviroment as Level3,
+from loyalwingmen.environments.level3.pyflyt_level3_environment_v2 import (
+    PyflytL3EnviromentV2 as Level3,
 )
 
 from loyalwingmen.rl_framework.agents.policies.ppo_policies import (

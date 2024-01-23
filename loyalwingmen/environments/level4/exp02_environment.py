@@ -201,7 +201,7 @@ class Exp02Environment(Env):
         pursuer.update_lidar()
 
         inertial_data: np.ndarray = self.process_inertial_state(pursuer)
-        # pursuer.lidar_data
+        pursuer.lidar_data
 
         lidar: np.ndarray = pursuer.lidar_data.get(
             "lidar",
@@ -213,11 +213,15 @@ class Exp02Environment(Env):
 
         gun_state = pursuer.gun_state
 
+        inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0).astype(
+            np.float32
+        )
+
         return {
             "lidar": lidar.astype(np.float32),
-            "inertial_data": inertial_data.astype(np.float32),
+            "inertial_data": inertial_gun_concat,  # inertial_data.astype(np.float32),
             "last_action": self.last_action.astype(np.float32),
-            "gun": gun_state.astype(np.float32),
+            # "gun": gun_state.astype(np.float32),
         }
 
     def _observation_space(self):
@@ -239,15 +243,7 @@ class Exp02Environment(Env):
 
         the other elements of the Box() shape varies from -1 to 1.
 
-        Inertial Data is composed by:
-
-        position,
-        velocity,
-        attitude,
-        quaternion,
-        angular_rate,
         """
-
         observation_shape = self.observation_shape()
         return spaces.Dict(
             {
@@ -258,8 +254,8 @@ class Exp02Environment(Env):
                     dtype=np.float32,
                 ),
                 "inertial_data": spaces.Box(
-                    -1,
-                    1,
+                    -np.ones((observation_shape["inertial_data"],)),
+                    np.ones((observation_shape["inertial_data"],)),
                     shape=(observation_shape["inertial_data"],),
                     dtype=np.float32,
                 ),
@@ -269,24 +265,26 @@ class Exp02Environment(Env):
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
-                "gun": spaces.Box(
-                    -1,
-                    1,
-                    shape=observation_shape["gun"],
-                    dtype=np.float32,
-                ),
+                # "gun": spaces.Box(
+                #    -1,
+                #    1,
+                #    shape=observation_shape["gun"],
+                #    dtype=np.float32,
+                # ),
             }
         )
 
     def observation_shape(self) -> dict:
+        pursuer = self.entities_manager.get_all_pursuers()[0]
+
         position = 3
         velocity = 3
         attitude = 3
         angular_rate = 3
+        gun_state = 3
 
-        inertial_data = position + velocity + attitude + angular_rate
+        inertial_data = position + velocity + attitude + angular_rate + gun_state
 
-        pursuer = self.entities_manager.get_all_pursuers()[0]
         lidar_shape = pursuer.lidar_shape
         last_action_shape = 4
 
@@ -296,7 +294,7 @@ class Exp02Environment(Env):
             "lidar": lidar_shape,
             "inertial_data": inertial_data,
             "last_action": last_action_shape,
-            "gun": gun_state_shape,
+            # "gun": gun_state_shape,
         }
 
     ## Helpers #####################################################################

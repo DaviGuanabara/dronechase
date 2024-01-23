@@ -21,6 +21,9 @@ from ......entities.navigators.loyalwingman_navigator import LoyalWingmanBehavio
 Exp02_Task is a task that uses the KamikazeNavigator to control the Loitering Munition and 
 uses RL agent to control the first pursuer.
 
+This is a TRAINING task, where the episode ends when the agent dies
+
+The Reward here were engineered to be sparse, taking account of enemies attacks.
 """
 
 
@@ -60,45 +63,35 @@ class Exp02_Task(Task):
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
-        self.NUM_PURSUERS = 1
+        self.MAX_BUILDING_LIFE = 1
+
+        self.NUM_PURSUERS = 2
         self.munition_per_defender = 20
+
         self.MAX_NUMBER_OF_ROUNDS = self.calculate_rounds(
             self.NUM_PURSUERS, self.munition_per_defender
         )
 
         self.NUM_INVADERS = self.MAX_NUMBER_OF_ROUNDS
-        # self.NUM_INVADERS = 1
-
-        self.current_round = 1
-        self.building_position = np.array([0, 0, 1])
 
         self.MAX_REWARD = 1000
-        self.PROXIMITY_THRESHOLD = 2
-        self.PROXIMITY_PENALTY = 1000
-        self.CAPTURE_DISTANCE = 0.2
 
         self.INVADER_EXPLOSION_RANGE = 0.2
         self.PURSUER_SHOOT_RANGE = 1
 
-        self.STEP_INCREMENT = 300
+        self.STEP_INCREMENT = 300  # Increment in time of each level
         self.MAX_STEP = 300  # 300 calls = 20 seconds for rl_frequency = 15
-        # STEP_PENALTY_SMOOTHING ensures that at the end of the episode the accumulated penalty is about MAX_REWARD
-        self.STEP_PENALTY_SMOOTHING = (
-            2 * self.MAX_REWARD / (self.MAX_STEP * (self.MAX_STEP + 1))
-        )
+
+        self.building_position = np.array([0, 0, 1])
 
     def init_globals(self):
         self.current_step = 0
-        self.MAX_BUILDING_LIFE = 1
+        self.current_round = 1
         self.building_life = self.MAX_BUILDING_LIFE
 
         self.kills = 0
         self.deads = 0
         self.is_building_destroyed = False
-        # self.is_building_destroyed = False
-
-        # self.MAX_BUILDING_LIFE = 3
-        # self.building_life = self.MAX_BUILDING_LIFE
 
     # ===============================================================================
     # Rounds Management
@@ -204,14 +197,12 @@ class Exp02_Task(Task):
         for invader in invaders:
             self.kamikaze_navigator.update(invader, self.offset_handler)
 
-    # TODO: para ter RL agent + BT, eu posso só pular o primeiro pursuer e deixar o resto como BT.
     def drive_loyalwingmen(self):
         pursuers: List[Quadcopter] = self.entities_manager.get_armed_pursuers()
 
-        # Skip the first pursuer in the list
+        # Skip the first pursuer (agent) in the list
         for pursuer in pursuers[1:]:
-            print(f"loyalwingman: {pursuer.id}")
-            self.loyalwingman_navigator.update(pursuer, self.offset_handler)
+            pursuer.drive(np.array([0, 0, 0, 0.5]))
 
     # ===============================================================================
     # On Calls
@@ -224,15 +215,10 @@ class Exp02_Task(Task):
         self.spawn_pursuer_squad()
 
     def on_reset(self):
-        # print("On Reset")
         self.on_episode_end()
         self.on_episode_start()
 
     def on_episode_start(self):
-        # print("\nOn Episode Start\n\n")
-        # self.entities_manager.arm_all()
-        # self.replace_invaders()
-
         self.reset_rounds()
         # TODO: o reset pursuer est'a muito longe do reset invaders. Isso remove uma certa ordem no c'odigo
 
@@ -243,10 +229,7 @@ class Exp02_Task(Task):
         self.kamikaze_navigator.reset()
         self.loyalwingman_navigator.reset()
 
-        # print("episode started")
-
     def on_episode_end(self):
-        # print("On Episode End")
         self.init_globals()
 
     def on_step_start(self):
@@ -346,63 +329,17 @@ class Exp02_Task(Task):
     def compute_reward(self, successful_shots: int = 0, pursuers_exploded: int = 0):
         # Initialize reward components
         score, bonus, penalty = 0, 0, 0
-        pursuers = self.entities_manager.get_armed_pursuers()
+        agent = self.entities_manager.get_all_pursuers()[0]
 
-        if len(pursuers) == 0:
-            return -self.MAX_REWARD
-
-        pursuer = pursuers[0]
-        # Calculate the current and last closest distances
-        current_closest_distance: int = (
-            self.offset_handler.current_closest_pursuer_to_invader_distance
-        )
-        last_closest_distance: int = (
-            self.offset_handler.last_closest_pursuer_to_invader_distance
-        )
-
-        # =======================================================================
-        # Calculate Base Score
-        #
-        # Ideal Distance: Define this as the shoot range minus a small buffer (e.g., shoot range - 0.1). This gives the pursuer some leeway to maneuver without getting too close to the invader.
-        # 1. Reward for Being Near the Ideal Distance: Provide a positive reward when the pursuer is near this ideal distance. The closer it is to the ideal distance, the higher the reward.
-        # 2. Penalty for Being Too Far: If the pursuer is farther than the shoot range, it should receive a negative reward proportional to the excess distance.
-        # 3. High Penalty for Getting Too Close: Since getting closer than 0.2 units results in destruction, the penalty should be significantly higher as the pursuer approaches this limit. A high value for
-        # γ makes sense here.
-        # =======================================================================
-
-        score = self.kills - current_closest_distance
-        # print(f"score: {score}")
-
-        # =======================================================================
-        # Bonuses
-        # 1. Bonus for Getting Closer: If the pursuer gets closer to the invader, it should receive a positive reward proportional to the distance it has moved.
-        # 2. Bonus for Capturing Invaders: If the pursuer captures an invader, it should receive a large positive reward.
-        # =======================================================================
-
-        # O que acontece se o pursuer tiver recarregando ?
-        # Ele ainda vai ser recompensado por se aproximar do alvo ?
-        if current_closest_distance < last_closest_distance:
-            velocity = pursuer.inertial_data.get("velocity", np.zeros(3))
-            bonus += 10 * np.linalg.norm(velocity)
-
-        # Bonus for capturing invaders
         if successful_shots > 0:
-            bonus += (
-                self.MAX_REWARD * successful_shots
-            ) + self.kills * self.MAX_REWARD / 10
-            # print(
-            #    f"bonus for successful shots: {self.MAX_REWARD * successful_shots + self.kills * self.MAX_REWARD / 10}"
-            # )
+            bonus += (successful_shots + self.kills / 10) * self.MAX_REWARD
 
-        # =======================================================================
-        # Penalties
-        # 1. Penalty for lost a pursuer: If the pursuer is destroyed, it should receive a large negative reward.
-        # 2. Penalty for pursuers outside the dome: If the pursuer is outside the dome, it should receive a large negative reward.
-        # 3. Penalty for touching the gound: If the pursuer touches the ground, it should receive a large negative reward.
-        # 4. Penalty for time passing
-        # =======================================================================
+        if agent.gun.munition == 0 and pursuers_exploded > 0:
+            # Suicide to kill pursuer
+            bonus += (successful_shots + self.kills / 10) * self.MAX_REWARD
 
-        penalty += self.MAX_REWARD * pursuers_exploded
+        elif pursuers_exploded > 0:
+            penalty += self.MAX_REWARD * pursuers_exploded
 
         # Penalty for pursuers outside the dome
         num_pursuer_outside_dome = len(
@@ -412,15 +349,9 @@ class Exp02_Task(Task):
             penalty += self.MAX_REWARD
 
         # Penalty for building life deviation
-        if self.building_life < self.MAX_BUILDING_LIFE:
+        if pursuers_exploded > 0 and self.building_life < self.MAX_BUILDING_LIFE:
             penalty += self.MAX_REWARD * (self.MAX_BUILDING_LIFE - self.building_life)
 
-        # pusuers_touched_ground = self.offset_handler.identify_pursuer_touched_ground()
-        # if len(pusuers_touched_ground) > 0:
-        #    penalty += self.MAX_REWARD * len(pusuers_touched_ground)
-
-        # theta = 0.025  # this theta and the limit of 300 steps ensures that the max penalty at the end of episode is about 1000
-        # penalty += theta * self.current_step
         return score + bonus - penalty
 
     def compute_termination(self) -> bool:
@@ -457,25 +388,19 @@ class Exp02_Task(Task):
             self._stage_status = TaskStatus.FAILURE
             return True
 
-        # All invaders captured.
-        # if len(self.entities_manager.get_armed_invaders()) == 0:
-        #    self._stage_status = TaskStatus.SUCCESS
-        #    return True
-
         # All pursuers destroyed.
         if len(self.entities_manager.get_armed_pursuers()) == 0:
             # print("All pursuers destroyed")
             self._stage_status = TaskStatus.FAILURE
             return True
 
-        # if len(self.offset_handler.identify_pursuer_touched_ground()) > 0:
-        #    self._stage_status = StageStatus.FAILURE
-        #    return True
+        # This is an training environment, which means that it has to stop when the agent dies.
+        agent = self.entities_manager.get_all_pursuers()[0]
 
-        # if len(self.offset_handler.identify_invader_touched_ground()) > 0:
-        #    self._stage_status = StageStatus.FAILURE
-        #    return True
-        # If none of the above conditions met, return False
+        if not agent.armed:
+            self._stage_status = TaskStatus.FAILURE
+            return True
+
         return False
 
     def compute_info(self):

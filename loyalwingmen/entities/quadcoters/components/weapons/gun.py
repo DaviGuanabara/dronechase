@@ -48,10 +48,12 @@ class Gun:
         self.timestep = message.get("timestep", 0)
         self.available = self.is_available()
 
-    def set_munition(self, munition: int):
+    def set_munition(self, munition: int, set_max_munition: bool = True):
         # print("set_munition", munition)
-        self.max_munition = munition
-        self.munition = munition
+
+        munition = 0 if munition < 0 else munition
+        self.max_munition = munition if set_max_munition else self.max_munition
+        self.munition = munition if munition < self.max_munition else self.max_munition
 
     def is_available(self):
         # print(
@@ -65,9 +67,14 @@ class Gun:
         #    self.cooldown_steps <= self.current_step - self.last_fired_step,
         # )
 
+        # TODO: this is the way i found to
+        # indicate that the LW should do suicide attack.
+        if not self.has_munition():
+            return True
+
         return (
             self.cooldown_steps <= self.current_step - self.last_fired_step
-        ) and self.has_munition()
+        )  # and self.has_munition()
 
     def has_munition(self):
         return self.munition > 0
@@ -101,9 +108,9 @@ class Gun:
 
         return np.array(
             [
-                self.munition / self.max_munition if self.max_munition > 0 else 1,
+                self.munition / (self.max_munition if self.max_munition > 0 else 1),
                 wait_time / self.cooldown_steps,
-                int(self.available),
+                int(self.is_available()),  # int(self.available),
             ]
         )
 

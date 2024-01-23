@@ -60,7 +60,7 @@ def callbacklist(
     env: VecEnv,
     log_path: str = "./logs/",
     model_path: str = "./models/",
-    save_freq: int = 10_000,
+    save_freq: int = 100_000,
     callbacks_to_include: Optional[List[CallbackType]] = None,
     n_eval_episodes: int = 10,
     debug: bool = False,

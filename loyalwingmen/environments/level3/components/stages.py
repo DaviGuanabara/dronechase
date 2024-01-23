@@ -8,6 +8,7 @@ from .offsets_handler import OffsetHandler
 from ....notification_system.message_hub import MessageHub
 from ....notification_system.topics_enum import Topics_Enum
 from typing import Dict, Optional
+import random
 
 
 class L3Stage1(Stage):
@@ -62,18 +63,19 @@ class L3Stage1(Stage):
 
     def init_constants(self):
         print("NUM PURSUERS = 1. ONLY THE RL AGENT")
-        self.NUM_PURSUERS = 1  # 1  # 2  # (1 for the RL Agent, and the other to simulate the support pursuer)
-        self.NUM_INVADERS = 1
+        self.NUM_PURSUERS = 2  # 1  # 2  # (1 for the RL Agent, and the other to simulate the support pursuer)
+        self.NUM_INVADERS = 5
 
         self.MAX_REWARD = 1000
-        self.PROXIMITY_THRESHOLD = 2
+        # self.PROXIMITY_THRESHOLD = 2
         self.PROXIMITY_PENALTY = 1000
-        self.CAPTURE_DISTANCE = 0.2
+        # self.CAPTURE_DISTANCE = 0.2
 
         self.INVADER_EXPLOSION_RANGE = 0.2
         self.PURSUER_SHOOT_RANGE = 1
 
-        self.MAX_STEP = 300  # 300 calls = 20 seconds for rl_frequency = 15
+        # self.MAX_STEP = 300  # 300 calls = 20 seconds for rl_frequency = 15
+        self.MAX_STEP = 600  # 600 calls = 40 seconds for rl_frequency = 15
         # STEP_PENALTY_SMOOTHING ensures that at the end of the episode the accumulated penalty is about MAX_REWARD
         self.STEP_PENALTY_SMOOTHING = (
             2 * self.MAX_REWARD / (self.MAX_STEP * (self.MAX_STEP + 1))
@@ -107,6 +109,13 @@ class L3Stage1(Stage):
     def on_episode_start(self):
         # print("\n\nOn Episode Start\n\n")
         self.quadcopter_manager.arm_all()
+
+        # Eles já ficam reaparecendo, então não precisa limitar a munição para 5. Ou talvez eu limite mesmo, para ver se ele aprende a suicidar.
+        # não sei se é uma boa ideia ou não... pq
+        # munition_values = [8]
+        # new_munition = random.choice(munition_values)
+        self.quadcopter_manager.get_all_pursuers()[0].gun.set_munition(4)
+
         # print("All quadcopters armed")
 
         self.offset_handler.on_episode_start()
@@ -115,7 +124,7 @@ class L3Stage1(Stage):
     def on_episode_end(self):
         self.init_globals()
         self.quadcopter_manager.disarm_all()
-        self.replace_invaders()
+        self.replace_disarmed_invaders()
         self.replace_pursuers()
 
         # print("All quadcopters replaced")
@@ -125,6 +134,8 @@ class L3Stage1(Stage):
         Here lies the methods that should be executed BEFORE the STEP.
         It aims to set the environment to the simulation step execution.
         """
+
+        # print(self.current_step)
         self.quadcopter_manager.drive_invaders()
         self.quadcopter_manager.drive_support_pursuers()
         pass
@@ -148,11 +159,21 @@ class L3Stage1(Stage):
 
         termination = self.compute_termination()
 
-        armed_invaders = self.quadcopter_manager.get_armed_invaders()
-        if len(armed_invaders) == 0:
-            self.replace_invaders()
-            invaders = self.quadcopter_manager.get_all_invaders()
-            self.quadcopter_manager.arm_by_quadcopter(invaders[0])
+        # armed_invaders = self.quadcopter_manager.get_armed_invaders()
+
+        # if len(armed_invaders) == 0:
+        #    self.replace_invaders()
+        #    invaders = self.quadcopter_manager.get_all_invaders()
+        #    self.quadcopter_manager.arm_by_quadcopter(invaders[0])
+
+        disarmed_invaders = self.quadcopter_manager.get_disarmed_invaders()
+        if len(disarmed_invaders) > 0:
+            self.replace_disarmed_invaders()
+            for invader in disarmed_invaders:
+                self.quadcopter_manager.arm_by_quadcopter(invader)
+
+            # invaders = self.quadcopter_manager.get_all_invaders()
+            # self.quadcopter_manager.arm_by_quadcopter(invaders[0])
 
         return reward, termination
 
@@ -161,6 +182,7 @@ class L3Stage1(Stage):
         return pursuer.gun_state
 
     def process_nearby_invaders(self):
+        # TODO: Account for LW suicide
         successful_shots = 0
         pursuers_exploded = 0
 
@@ -202,10 +224,10 @@ class L3Stage1(Stage):
     def on_step_end(self):
         self.offset_handler.on_end_step()
 
-        if self.debug_on and self.current_step % 2 == 0:
-            pursuers = self.quadcopter_manager.get_all_pursuers()
-            for pursuer in pursuers:
-                pursuer.lidar.debug_sphere()
+        # if self.debug_on and self.current_step % 2 == 0:
+        #    pursuers = self.quadcopter_manager.get_all_pursuers()
+        #    for pursuer in pursuers:
+        #        pursuer.lidar.debug_sphere()
 
     @property
     def status(self):
@@ -240,7 +262,7 @@ class L3Stage1(Stage):
         # Calculate Base Score
         # =======================================================================
 
-        if gun_available:
+        if gun_available == 1:
             score = -current_closest_distance
 
         elif munition == 0:
@@ -253,8 +275,13 @@ class L3Stage1(Stage):
         # bonification for getting closer to the invader
         # 0.01 works like an threshold to avoid moviment oscilation trigger the bonus
         # I identified oscilations at maximun about 0.003. So, 0.01 is a good value (1/20 the dimension of the quadcopter that is already small).
-        if 0.01 < last_closest_distance - current_closest_distance and gun_available:
-            bonus += 10 * (last_closest_distance - current_closest_distance)
+        if 0.01 < last_closest_distance - current_closest_distance and (
+            gun_available == 1 or munition == 0
+        ):
+            agent = self.quadcopter_manager.get_all_pursuers()[0]
+            velocity = agent.inertial_data.get("velocity", np.zeros(3))
+            bonus += 10 * np.linalg.norm(velocity)  # type: ignore
+            # bonus += 10 * (last_closest_distance - current_closest_distance)
         bonus += self.MAX_REWARD * successful_shots
         penalty += self.MAX_REWARD * pursuers_exploded
 
@@ -300,7 +327,7 @@ class L3Stage1(Stage):
         #    return True
 
         # All pursuers destroyed.
-        if len(self.quadcopter_manager.get_armed_pursuers()) == 0:
+        if len(self.quadcopter_manager.get_armed_pursuers()) < self.NUM_PURSUERS:
             # print("All pursuers destroyed")
             self._stage_status = StageStatus.FAILURE
             return True
@@ -339,9 +366,11 @@ class L3Stage1(Stage):
 
         return np.column_stack((xs, ys, zs))
 
-    def replace_invaders(self):
+    def replace_disarmed_invaders(self):
         # self.quadcopter_manager.disarm_all()
-        invaders = self.quadcopter_manager.get_all_invaders()
+        invaders = (
+            self.quadcopter_manager.get_disarmed_invaders()
+        )  # self.quadcopter_manager.get_all_invaders()
         positions = self.generate_positions(len(invaders), 2, 6)  # 6)
         self.quadcopter_manager.replace_quadcopters(invaders, positions)
 
