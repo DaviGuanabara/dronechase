@@ -15,13 +15,17 @@ from stable_baselines3.common.env_checker import check_env
 
 from loyalwingmen.environments.utils.keyboard_listener import KeyboardListener
 from loyalwingmen.environments.level3.pyflyt_level3_environment_v2 import (
-    PyflytL3EnviromentV2 as Level3,
+    PyflytL3EnviromentV2 as Level4,
+)
+
+from loyalwingmen.environments.level4.exp02_environment import (
+    Exp02Environment as level4,
 )
 
 # from loyalwingmen.modules.utils.displaytext import log
 import numpy as np
 
-env = Level3(GUI=True, rl_frequency=15)
+env = level4(GUI=True, rl_frequency=15)
 
 keyboard_listener = KeyboardListener(env.get_keymap())
 
