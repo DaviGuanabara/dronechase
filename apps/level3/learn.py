@@ -14,34 +14,58 @@ from datetime import datetime
 import os
 from stable_baselines3 import PPO
 
-from loyalwingmen.modules.environments_pyflyt.level3.pyflyt_level3_environment import (
+from loyalwingmen.environments.level3.pyflyt_level3_environment import (
     PyflytL3Enviroment as Level3,
 )
-from loyalwingmen.rl_tools.policies.ppo_policies import (
-    LidarInertialActionExtractor,
+
+from loyalwingmen.rl_framework.agents.policies.ppo_policies import (
     LidarInertialActionExtractor2,
 )
 
 from multiprocessing import cpu_count
 from stable_baselines3.common.vec_env import SubprocVecEnv
+from loyalwingmen.rl_framework.utils.directory_manager import DirectoryManager
 
-from loyalwingmen.rl_tools.callback_factory import callbacklist
 import torch.nn as nn
 import torch as th
 import math
 
 from stable_baselines3.common.vec_env import VecMonitor
-from loyalwingmen.rl_tools.directory_manager import DirectoryManager
 import torch
+
+from loyalwingmen.rl_framework.utils.pipeline import (
+    ReinforcementLearningPipeline,
+    callbacklist,
+    CallbackType,
+)
 
 # ===============================================================================
 # Setup
 # ===============================================================================
 
 
+def setup_environment():
+    number_of_logical_cores = cpu_count()
+    n_envs = int(number_of_logical_cores)
+
+    env_fns = [lambda: Level3(GUI=False, rl_frequency=15) for _ in range(n_envs)]
+    vectorized_environment = VecMonitor(SubprocVecEnv(env_fns))  # type: ignore
+
+    return vectorized_environment
+
+
+def setup(path):
+    # path = "apps\\level3\\from level 2\\mPPO-r4985.2099609375-sd1149.3851318359375.zip"
+
+    env = setup_environment()
+    model = PPO.load(path)
+
+    return env, model
+
+
 def directories(study_name: str):
     app_name, _ = os.path.splitext(os.path.basename(__file__))
-    output_folder = os.path.join("output", app_name, study_name)
+    output_folder = os.path.join("output_level3", app_name, study_name)
     DirectoryManager.create_directory(output_folder)
 
     models_dir = os.path.join(output_folder, "models_dir")
@@ -51,42 +75,18 @@ def directories(study_name: str):
 
 
 def main():
-    # Check if CUDA is available and set the device accordingly
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    path = "apps\\level3\\from level 2\\mPPO-r4985.2099609375-sd1149.3851318359375.zip"
 
-    study_name = "01.10.2023"  # datetime.date.today()
+    study_name = "01.10.2023"
     models_dir, logs_dir, output_folder = directories(study_name)
 
-    number_of_logical_cores = cpu_count()
-    n_envs = int(number_of_logical_cores)
-
-    env_fns = [lambda: Level3(GUI=False, rl_frequency=15) for _ in range(n_envs)]
-
-    vectorized_environment = VecMonitor(SubprocVecEnv(env_fns))  # type: ignore
+    vectorized_environment, model = setup(path)
 
     callback_list = callbacklist(
         vectorized_environment,
         log_path=logs_dir,
         model_path=models_dir,
         save_freq=100_000,
-    )
-
-    nn_t = [512, 128, 256]
-
-    policy_kwargs = dict(
-        features_extractor_class=LidarInertialActionExtractor2,
-        features_extractor_kwargs=dict(features_dim=512, device=device),
-        net_arch=dict(pi=nn_t, vf=nn_t),
-    )
-
-    model = PPO(
-        "MultiInputPolicy",
-        vectorized_environment,
-        verbose=0,
-        device=device,
-        policy_kwargs=policy_kwargs,
-        learning_rate=0.00001,
-        batch_size=512,
     )
 
     print(model.policy)

@@ -163,6 +163,32 @@ class OffsetHandler:
 
         return distances, directions
 
+    # TODO: Refactor this method
+    def identify_closest_ally(self, pursuer_id) -> int:
+        try:
+            pursuer_index = self.current_offsets.pursuer_ids.index(pursuer_id)
+        except ValueError:
+            # Pursuer ID not found
+            return -1
+
+        allies_positions = self.current_offsets.pursuer_positions
+        if len(allies_positions) <= 1:
+            return -1  # No allies present
+
+        pursuer_position = allies_positions[pursuer_index]
+
+        # Calculate distances vectorized
+        distances = np.linalg.norm(allies_positions - pursuer_position, axis=1)
+
+        # Set the distance to itself as np.inf to ignore it
+        distances[pursuer_index] = np.inf
+
+        # Find the index of the closest ally
+        closest_ally_index = np.argmin(distances)
+
+        # Return the ID of the closest ally
+        return self.current_offsets.pursuer_ids[closest_ally_index]
+
     # ===========================================================================
     # Helpers
     # ===========================================================================
@@ -172,16 +198,20 @@ class OffsetHandler:
         return self.current_offsets.pursuer_velocities
 
     @property
-    def current_closest_pursuer_to_invader_distance(self) -> int:
+    def current_closest_agent_to_invader_distance(self) -> int:
         return np.sum(
-            self.compute_closest_pursuer_distance(self.current_offsets.distances)
+            self.compute_closest_rl_agent_distance(self.current_offsets.distances)
         )
 
     @property
-    def last_closest_pursuer_to_invader_distance(self) -> int:
+    def last_closest_agent_to_invader_distance(self) -> int:
         return np.sum(
-            self.compute_closest_pursuer_distance(self.last_offsets.distances)
+            self.compute_closest_rl_agent_distance(self.last_offsets.distances)
         )
+
+    def compute_closest_rl_agent_distance(self, distances) -> np.ndarray:
+        # print("distances:", distances[0])
+        return np.min(distances[0], axis=0)
 
     def compute_closest_pursuer_distance(self, distances) -> np.ndarray:
         return np.min(distances, axis=0)
@@ -278,6 +308,36 @@ class OffsetHandler:
 
         return invaders_in_range
 
+    def get_closest_invader_by_pursuer_within_range(
+        self, range_threshold: float
+    ) -> Dict[int, int]:
+        """
+        Identify the closest invader within a specified range for each pursuer and return a dictionary.
+        Each key is a pursuer ID, and the value is the ID of the closest invader within range.
+        """
+        range_mask = self.current_offsets.distances < range_threshold
+        closest_invader_per_pursuer = {}
+
+        for pursuer_index, pursuer_id in enumerate(self.current_offsets.pursuer_ids):
+            # Mask for invaders within range of this specific pursuer
+            invaders_indices = np.where(range_mask[pursuer_index])[0]
+
+            # Calculate the distances to invaders within range
+            distances = self.current_offsets.distances[pursuer_index, invaders_indices]
+
+            # Associate invaders with their respective distances and sort
+            invaders_distances = zip(invaders_indices, distances)
+            sorted_invaders = sorted(invaders_distances, key=lambda x: x[1])
+
+            # Save the ID of the closest invader if any are within range
+            if sorted_invaders:
+                closest_invader_id = self.current_offsets.invader_ids[
+                    sorted_invaders[0][0]
+                ]
+                closest_invader_per_pursuer[pursuer_id] = closest_invader_id
+
+        return closest_invader_per_pursuer
+
     def identify_invaders_in_origin(self, threshold_range=0.2) -> list:
         invaders_in_origin_bool_array = (
             np.linalg.norm(self.current_offsets.invader_positions, axis=1)
@@ -286,6 +346,31 @@ class OffsetHandler:
         return list(
             np.array(self.current_offsets.invader_ids)[invaders_in_origin_bool_array]
         )
+
+    def identify_closest_invader_to_origin(self) -> int:
+        """
+        Identify the closest invader to the origin and return their ID.
+
+        Returns:
+            int: The ID of the closest invader.
+        """
+
+        # Check if there are any invaders
+        if len(self.current_offsets.invader_positions) == 0:
+            return -1
+
+        # Extract distances to this pursuer from all invaders
+        distances_to_origin = np.linalg.norm(
+            self.current_offsets.invader_positions, axis=1
+        )
+
+        # Find the minimum distance and corresponding invader index
+        closest_invader_index = np.argmin(distances_to_origin)
+
+        # Get the ID of the closest invader
+        closest_invader_id = self.current_offsets.invader_ids[closest_invader_index]
+
+        return closest_invader_id
 
     def identify_pursuer_outside_dome(self) -> list:
         pursuers_outside_dome_bool_array = (

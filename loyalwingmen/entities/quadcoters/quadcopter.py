@@ -248,8 +248,8 @@ class Quadcopter:
         self.lidar.update_data()
         lidar_data = self.lidar.read_data()
         self._update_flight_state(lidar_data)
-        if self.debug_on:
-            self.lidar.debug_sphere()
+        # if self.debug_on:
+        #    self.lidar.debug_sphere()
         # Note: We don't publish the flight state here
 
     @property
@@ -322,8 +322,8 @@ class Quadcopter:
         - motion_command: The command to be applied. This could be RPM values, thrust levels, etc.
         """
 
-        # if show_name_on:
-        #    self.show_name()
+        if show_name_on:
+            self.show_name()
 
         # Remmeber that was chosen mdode 6:
         # - 6: vx, vy, vr, vz
@@ -504,6 +504,6 @@ class Quadcopter:
         and not the parameters that are used to calculate them, like propeller radius, etc.
         """
         speed_modulator = 1
-        max_speed_kmh = 30
+        max_speed_kmh = 10
         KMH_TO_MS = 1000 / 3600
         return speed_modulator * max_speed_kmh * KMH_TO_MS

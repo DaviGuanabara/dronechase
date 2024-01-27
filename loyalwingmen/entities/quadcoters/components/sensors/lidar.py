@@ -203,6 +203,13 @@ class LiDAR(Sensor):
         self.sphere[self.DISTANCE_CHANNEL_IDX][theta_point][phi_point] = norm_distance
         self.sphere[self.FLAG_CHANNEL_IDX][theta_point][phi_point] = flag
 
+        # print(
+        #    f"target_id:{target_id}, norm_distance:{norm_distance}, theta_point:{theta_point}, phi_point:{phi_point}, flag:{flag}"
+        # )
+        # print(
+        #    f"self.sphere[self.DISTANCE_CHANNEL_IDX][theta_point][phi_point]:{self.sphere[self.DISTANCE_CHANNEL_IDX][theta_point][phi_point]}"
+        # )
+
     def _rotate_position(self, position: np.ndarray) -> np.ndarray:
         quaternion = self.parent_inertia["quaternion"]
         rotation_matrix = (
@@ -226,6 +233,9 @@ class LiDAR(Sensor):
                 rotated_position
             )
             self._add_spherical(target_id, spherical, flag)
+
+        # else:
+        #    print(f"distance:{distance}, radius:{self.radius}")
 
     def _add_end_position_for_entity(
         self, position: np.ndarray, entity_type: EntityType, target_id: int
@@ -275,6 +285,7 @@ class LiDAR(Sensor):
         elif publisher_id == self.parent_id:
             self.parent_inertia = message
         else:
+            # print("buffer_inertial_data", message, publisher_id)
             self.buffer_manager.buffer_message(message, publisher_id)
 
     def calculate_extremity_points(self, position, dimensions):

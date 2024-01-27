@@ -34,13 +34,16 @@ for _ in range(50_000):
     # action = np.array([0, 0, 0, 0.5])
     observation, reward, terminated, truncated, info = env.step(action)
     # print(observation["gun"])
-    # print(f"reward:{reward:.2f}, gun observation:{observation['gun']}")
+    print(f"reward:{reward:.2f}, gun observation:{observation['gun']}")
     # reward_acc += reward
     # print(f"reward:{reward:.2f}, reward_acc:{reward_acc}")
     # log(f"reward:{reward:.2f}")
+    # print(f"reward:{reward} - reward_acc:{reward_acc}")
+    # print(f"observation:{observation}")
 
-    print(f"action:{action}")
+    # print(f"action:{action}")
     time.sleep(0.01)
+    reward_acc += reward
 
     if terminated:
         observation, info = env.reset()

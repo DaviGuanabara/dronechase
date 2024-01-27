@@ -11,9 +11,14 @@ import pstats
 
 
 def setup_environment():
+    print("Load - Level 2")
+    # path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level2\\output_mac\\baysian_optimizer_app\\level2_1.00M_03.12.2023_baysian\\models_dir\\h[512, 256, 128]-f15-lr0.001\\mPPO-r4985.2099609375-sd1149.3851318359375.zip"
+    # path = "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level2\\output\\baysian_optimizer_app_v3\\20_12.2023_level3_1.00M_v2_for_extractor_v3\\models_dir\\h[512, 1024, 128]_f15_lr0.0001\\t0_PPO_r1362.58.zip"
     env = Level2(GUI=True, rl_frequency=15)
     model = PPO.load("./ppo_level2_lidar_03_12_2023")
+    # model = PPO.load(path)
     observation, _ = env.reset(0)
+    print(observation.keys())
     return env, model, observation
 
 

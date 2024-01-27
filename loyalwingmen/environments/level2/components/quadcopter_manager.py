@@ -68,6 +68,9 @@ class QuadcopterManager:
             drone.drive(
                 np.array([positions[i][0], positions[i][1], 0, positions[i][2]])
             )
+            # drone.set_setpoint(
+            #    np.array([positions[i][0], positions[i][1], 0, positions[i][2]])
+            # )
             data = QuadcopterBlueprint(
                 positions[i], np.zeros(3), EntityType.LOITERINGMUNITION
             )
@@ -141,21 +144,35 @@ class QuadcopterManager:
             )
             drones[i].update_imu()
 
+            if drones[i].quadcopter_type == EntityType.LOITERINGMUNITION:
+                position = self.blueprints[i].position
+                drones[i].drive(np.array([position[0], position[1], 0, position[2]]))
+                # print("setpoint", drones[i].quadx.setpoint)
+            # if drones[i].quadcopter_type == EntityType.LOITERINGMUNITION:
+            # position = self.blueprints[i].position
+            # drones[i].update_imu()
+            # drones[i].set_mode(7)
+            # motion_command = np.array([position[0], position[1], 0, position[2]])
+            # drones[i].set_setpoint(motion_command)
+            # print("replace invader", "motion command:", motion_command)
+
     def replace_quadcopter(
         self, drone: Quadcopter, position: np.ndarray, attitude: np.ndarray
     ):
         drone.replace(position, attitude)
+        drone.update_imu()
 
     def replace_invader(
         self, invader: Quadcopter, position: np.ndarray, attitude: np.ndarray
     ):
-        print("replace invader")
+        # print("replace invader")
         invader.replace(position, attitude)
         motion_command = np.array([position[0], position[1], 0, position[2]])
         # TODO: set_setpoint must be removed. It is a temporary solution
         # The solution should be using the 'drive' method
         # But, is necessary to put conditions there to work in different 'modes'
         invader.set_setpoint(motion_command)
+        # invader.drive(motion_command)
         invader.update_imu()
         invader.update_control()
         invader.update_physics()

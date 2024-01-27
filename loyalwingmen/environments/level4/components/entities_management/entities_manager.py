@@ -104,8 +104,9 @@ class EntitiesManager:
     # ===========================================================================
 
     def spawn_ground(self, dome_radius: float):
+        # TODO: IT IS HARD CODED INTO THE TASK. I HAVE TO CHANGE IT.
         self.ground = ImmovableStructures.spawn_ground(
-            self.simulation, [0, 0, 0], dome_radius
+            self.simulation, [0, 0, -6], dome_radius
         )
 
     def spawn_protected_building(self):
@@ -165,6 +166,8 @@ class EntitiesManager:
 
     def get_all_pursuers(self) -> "list[Quadcopter]":
         return self.get_quadcopters(quadcopter_type=EntityType.LOYALWINGMAN)
+
+    # def get_rl_agent(self)
 
     # ===========================================================================
     # Arm and Disarm.

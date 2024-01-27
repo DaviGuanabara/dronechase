@@ -54,6 +54,9 @@ class Task(ABC):
     def compute_info(self):
         return {}
 
+    def update_model_path(self, model_params):
+        pass
+
     @property
     def status(self):
         return TaskStatus.FAILURE
@@ -133,3 +136,6 @@ class TaskProgression:
     def get_current_stage_number(self) -> int:
         """Get the current stage number."""
         return self._current_stage_number
+
+    def update_model_path(self, model_params):
+        self.current_stage.update_model_path(model_params)

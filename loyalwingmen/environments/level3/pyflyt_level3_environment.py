@@ -32,12 +32,15 @@ class PyflytL3Enviroment(Env):
         dome_radius: float = 8,
         rl_frequency: int = 15,
         GUI: bool = False,
+        debug_on: bool = False,
     ):
         """Initialize the environment."""
 
+        self.debug = debug_on
+        self.init_constants(dome_radius, rl_frequency, GUI)
         self.init_components(dome_radius, GUI)
         self.frequency_adjustments(rl_frequency)
-        self.init_constants(dome_radius, rl_frequency, GUI)
+
         self.init_globals()
 
         print("pyflyt level 3 environment init")
@@ -72,7 +75,7 @@ class PyflytL3Enviroment(Env):
         self.simulation = L3AviarySimulation(world_scale=dome_radius, render=GUI)
         self.quadcopter_manager = QuadcopterManager(self.simulation, debug_on=GUI)
         self.task_progression = TaskProgression(
-            [Stage1(self.quadcopter_manager, dome_radius)]
+            [Stage1(self.quadcopter_manager, dome_radius, debug_on=self.debug_on)]
         )
 
         # plane_id = self.simulation.loadURDF("plane.urdf", basePosition=[0, 0, 0])
