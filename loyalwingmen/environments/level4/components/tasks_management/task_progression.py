@@ -57,6 +57,9 @@ class Task(ABC):
     def update_model_path(self, model_params):
         pass
 
+    def update_model(self, model):
+        pass
+
     @property
     def status(self):
         return TaskStatus.FAILURE
@@ -139,3 +142,6 @@ class TaskProgression:
 
     def update_model_path(self, model_params):
         self.current_stage.update_model_path(model_params)
+
+    def update_model(self, model):
+        self.current_stage.update_model(model)

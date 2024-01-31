@@ -13,8 +13,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
 
-from loyalwingmen.environments.level4.exp04_cooperative_only_bt_stopped_environment import (
-    Exp04CooperativeOnlyBTStoppedEnvironment as level4,
+from loyalwingmen.environments.level4.exp05_cooperative_only_2_rl_v2_environment import (
+    Exp05CooperativeOnly2RLV2Environment as level4,
 )
 
 from loyalwingmen.rl_framework.utils.pipeline import (
@@ -116,18 +116,34 @@ def rl_pipeline(
     n_eval_episodes: int = 100,
     trial_number: int = 0,
 ) -> Tuple[float, float, float]:
-    # app_name, _ = os.path.splitext(os.path.basename(__file__))
-
     frequency = suggestions["rl_frequency"]
     learning_rate = suggestions["learning_rate"]
 
-    hiddens = get_hiddens(suggestions)
-
     vectorized_environment: VecMonitor = (
-        ReinforcementLearningPipeline.create_vectorized_environment(
+        ReinforcementLearningPipeline.create_vectorized_multi_agent_v2_environment(
             environment=level4, env_kwargs=suggestions
         )
     )
+
+    print("Melhor do Level 3: ")
+    print("t2_PPO_r4427.63.zip - Trial 02")
+    path_lib = Path(
+        "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output\\baysian_optimizer_app_v2_ciclo_02\\19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls\\Trial_2\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t2_PPO_r4427.63.zip"
+    )
+
+    model = PPO.load(str(path_lib), vectorized_environment, device="cuda")
+    suggestions["model"] = model
+
+    lr_schedule = lambda _: learning_rate
+    model.learning_rate = lr_schedule
+    model.batch_size = suggestions["batch_size"]
+    model.tensorboard_log = logs_dir
+    new_logger = configure(logs_dir, ["csv", "tensorboard"])
+    model.set_logger(new_logger)
+
+    logging.info(model.policy)
+
+    vectorized_environment.env_method("update_model", model)
 
     callback_list = ReinforcementLearningPipeline.create_callback_list(
         vectorized_environment,
@@ -138,30 +154,16 @@ def rl_pipeline(
         debug=True,
     )
 
+    print(torch.cuda.is_available())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # path_lib = Path("from_level_2/mPPO-r4985.2099609375-sd1149.3851318359375.zip")
-    print("Melhor do Level 3: ")
-    print("t2_PPO_r4427.63.zip - Trial 02")
-    path_lib = Path(
-        "/Users/Davi/Library/CloudStorage/OneDrive-Pessoal/1. Projects/1. Dissertação/01 - Code/Experiment Results/Etapa 02/Ciclo 02/19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls/Trial_2/models_dir/h[128, 256, 512]_f15_lr0.0001/t2_PPO_r4427.63"
-    )
-    model = PPO.load(str(path_lib), env=vectorized_environment)
-    lr_schedule = lambda _: learning_rate
-    model.learning_rate = lr_schedule
-    model.batch_size = suggestions["batch_size"]
-    model.tensorboard_log = logs_dir
+    print("Device:", device)
 
-    new_logger = configure(logs_dir, ["csv", "tensorboard"])
-    model.set_logger(new_logger)
-
-    logging.info(model.policy)
     model.learn(
         total_timesteps=n_timesteps,
         callback=callback_list,
-        tb_log_name="stage1_first_run",
+        tb_log_name=f"stage{1}",
     )
 
-    # TODO: SAVE ALL THE DATA ABOUT THE TRAINING. USE 100 EPISODES TO EVALUATE THE MODEL
     (
         avg_reward,
         std_dev,
@@ -172,6 +174,8 @@ def rl_pipeline(
     )
 
     ReinforcementLearningPipeline.save_evaluation(episode_rewards, logs_dir)
+
+    hiddens = get_hiddens(suggestions)
 
     ReinforcementLearningPipeline.save_model(
         model,
@@ -209,13 +213,11 @@ def directories(study_name: str):
 
 
 def main():
-    print("The exp04 is air combat 1rl and 1bt stopped")
+    print("REMINDER: The exp05 is air combat only WITH 2 RL.")
     n_trials = 10
-    n_timesteps = 2_000_000
+    n_timesteps = 500_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = (
-        f"25_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp04_best_of_level3_p01"
-    )
+    study_name = f"28_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp05_v2_p04"
 
     print("Baysian Optimizer App - V2")
     print(f"number of trials: {n_trials}")

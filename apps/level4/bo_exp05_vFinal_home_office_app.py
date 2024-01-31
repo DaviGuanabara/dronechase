@@ -13,9 +13,10 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
 
-from loyalwingmen.environments.level4.exp04_cooperative_only_bt_stopped_environment import (
-    Exp04CooperativeOnlyBTStoppedEnvironment as level4,
+from loyalwingmen.environments.level4.exp05_vFinal_environment import (
+    Exp05vFinalEnvironment as level4,
 )
+
 
 from loyalwingmen.rl_framework.utils.pipeline import (
     ReinforcementLearningPipeline,
@@ -118,48 +119,64 @@ def rl_pipeline(
 ) -> Tuple[float, float, float]:
     # app_name, _ = os.path.splitext(os.path.basename(__file__))
 
+    timesteps_fraction = 200_000
+
     frequency = suggestions["rl_frequency"]
     learning_rate = suggestions["learning_rate"]
 
-    hiddens = get_hiddens(suggestions)
+    print("Melhor do Level 3: ")
+    print("t2_PPO_r4427.63.zip - Trial 02")
+    path_lib = Path(
+        "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output\\baysian_optimizer_app_v2_ciclo_02\\19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls\\Trial_2\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t2_PPO_r4427.63.zip"
+    )
 
+    suggestions["model_path"] = path_lib
     vectorized_environment: VecMonitor = (
-        ReinforcementLearningPipeline.create_vectorized_environment(
+        ReinforcementLearningPipeline.create_vectorized_multi_agent_environment(
             environment=level4, env_kwargs=suggestions
         )
     )
 
-    callback_list = ReinforcementLearningPipeline.create_callback_list(
-        vectorized_environment,
-        model_dir=models_dir,
-        log_dir=logs_dir,
-        callbacks_to_include=[CallbackType.EVAL, CallbackType.PROGRESSBAR],
-        n_eval_episodes=n_eval_episodes,
-        debug=True,
-    )
+    model = PPO.load(str(path_lib), vectorized_environment)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # path_lib = Path("from_level_2/mPPO-r4985.2099609375-sd1149.3851318359375.zip")
-    print("Melhor do Level 3: ")
-    print("t2_PPO_r4427.63.zip - Trial 02")
-    path_lib = Path(
-        "/Users/Davi/Library/CloudStorage/OneDrive-Pessoal/1. Projects/1. Dissertação/01 - Code/Experiment Results/Etapa 02/Ciclo 02/19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls/Trial_2/models_dir/h[128, 256, 512]_f15_lr0.0001/t2_PPO_r4427.63"
-    )
-    model = PPO.load(str(path_lib), env=vectorized_environment)
     lr_schedule = lambda _: learning_rate
     model.learning_rate = lr_schedule
     model.batch_size = suggestions["batch_size"]
-    model.tensorboard_log = logs_dir
-
-    new_logger = configure(logs_dir, ["csv", "tensorboard"])
-    model.set_logger(new_logger)
-
+    # model.tensorboard_log = logs_dir
     logging.info(model.policy)
-    model.learn(
-        total_timesteps=n_timesteps,
-        callback=callback_list,
-        tb_log_name="stage1_first_run",
-    )
+
+    total_chunks = n_timesteps // timesteps_fraction  # Calculate total number of chunks
+
+    for i in range(total_chunks):
+        print(f"Training chunk {i+1} of {total_chunks}")
+        chunck_log_dir = os.path.join(logs_dir, f"t{trial_number}_s{i}_PPO")
+
+        model.tensorboard_log = chunck_log_dir
+        new_logger = configure(chunck_log_dir, ["csv", "tensorboard"])
+        model.set_logger(new_logger)
+
+        callback_list = ReinforcementLearningPipeline.create_callback_list(
+            vectorized_environment,
+            model_dir=models_dir,
+            log_dir=chunck_log_dir,
+            callbacks_to_include=[CallbackType.EVAL, CallbackType.PROGRESSBAR],
+            n_eval_episodes=n_eval_episodes,
+            debug=True,
+        )
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # path_lib = Path("from_level_2/mPPO-r4985.2099609375-sd1149.3851318359375.zip")
+
+        model.learn(
+            total_timesteps=timesteps_fraction,  # n_timesteps,
+            callback=callback_list,
+            tb_log_name=f"stage{i+1}",
+        )
+
+        print("Saving model chunk...")
+        path = os.path.join(models_dir, f"t{trial_number}_s{i}_PPO")
+        model.save(path)
+        vectorized_environment.env_method("update_model_path", path)
 
     # TODO: SAVE ALL THE DATA ABOUT THE TRAINING. USE 100 EPISODES TO EVALUATE THE MODEL
     (
@@ -172,6 +189,8 @@ def rl_pipeline(
     )
 
     ReinforcementLearningPipeline.save_evaluation(episode_rewards, logs_dir)
+
+    hiddens = get_hiddens(suggestions)
 
     ReinforcementLearningPipeline.save_model(
         model,
@@ -209,13 +228,11 @@ def directories(study_name: str):
 
 
 def main():
-    print("The exp04 is air combat 1rl and 1bt stopped")
+    print("EXP05 vFinal - Air Combat - 2 RL.")
     n_trials = 10
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = (
-        f"25_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp04_best_of_level3_p01"
-    )
+    study_name = f"31_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp05_vFinal"
 
     print("Baysian Optimizer App - V2")
     print(f"number of trials: {n_trials}")

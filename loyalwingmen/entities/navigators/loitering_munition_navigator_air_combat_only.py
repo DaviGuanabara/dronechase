@@ -93,6 +93,9 @@ class KamikazeNavigator(Navigator):
 
     def _get_closest_pursuers_position(self, offset_handler, invader_id):
         closest_pursuer_id = offset_handler.identify_closest_pursuer(invader_id)
+        if closest_pursuer_id == -1:
+            return np.array([0, 0, 0])
+
         return offset_handler.get_pursuer_position(closest_pursuer_id)
 
 
@@ -179,7 +182,9 @@ class CollideWithWingmanState(State):
         invader_position = agent.inertial_data["position"]
         vector = target_position - invader_position
         direction = (
-            vector / np.linalg.norm(vector) if np.linalg.norm(vector) > 0 else vector
+            vector / np.linalg.norm(vector)
+            if float(np.linalg.norm(vector)) > 0
+            else vector
         )
 
         agent.drive(np.array([*direction, navigator.velocity]))
@@ -224,7 +229,9 @@ class CollideWithBuildingState(State):
 
         vector = target_position - invader_position
         direction = (
-            vector / np.linalg.norm(vector) if np.linalg.norm(vector) > 0 else vector
+            vector / np.linalg.norm(vector)
+            if float(np.linalg.norm(vector)) > 0
+            else vector
         )
 
         # print("CollideWithBuilding Execute - direction", direction)

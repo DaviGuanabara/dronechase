@@ -13,8 +13,8 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
 
-from loyalwingmen.environments.level4.exp04_cooperative_only_bt_stopped_environment import (
-    Exp04CooperativeOnlyBTStoppedEnvironment as level4,
+from loyalwingmen.environments.level4.exp02_vFinal_environment import (
+    Exp02vFinalEnvironment as level4,
 )
 
 from loyalwingmen.rl_framework.utils.pipeline import (
@@ -143,7 +143,7 @@ def rl_pipeline(
     print("Melhor do Level 3: ")
     print("t2_PPO_r4427.63.zip - Trial 02")
     path_lib = Path(
-        "/Users/Davi/Library/CloudStorage/OneDrive-Pessoal/1. Projects/1. Dissertação/01 - Code/Experiment Results/Etapa 02/Ciclo 02/19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls/Trial_2/models_dir/h[128, 256, 512]_f15_lr0.0001/t2_PPO_r4427.63"
+        "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output\\baysian_optimizer_app_v2_ciclo_02\\19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls\\Trial_2\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t2_PPO_r4427.63.zip"
     )
     model = PPO.load(str(path_lib), env=vectorized_environment)
     lr_schedule = lambda _: learning_rate
@@ -209,13 +209,11 @@ def directories(study_name: str):
 
 
 def main():
-    print("The exp04 is air combat 1rl and 1bt stopped")
-    n_trials = 10
+    print("EXP02 vFinal - Air Combat - 1RL")
+    n_trials = 20
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = (
-        f"25_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp04_best_of_level3_p01"
-    )
+    study_name = f"31_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp02_vFinal"
 
     print("Baysian Optimizer App - V2")
     print(f"number of trials: {n_trials}")

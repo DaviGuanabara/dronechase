@@ -5,7 +5,7 @@ import logging
 
 from scipy.stats import randint, uniform
 from stable_baselines3 import PPO, SAC
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, DummyVecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 
 from ..agents.policies.ppo_policies import CustomActorCriticPolicy, CustomCNN
@@ -82,6 +82,35 @@ class ReinforcementLearningPipeline:
         env_fns = [lambda: environment(**valid_env_kwargs) for _ in range(n_envs)]
 
         vectorized_environment = SubprocVecEnv(env_fns)  # type: ignore
+        return VecMonitor(vectorized_environment)
+
+    @staticmethod
+    def create_vectorized_multi_agent_v2_environment(
+        environment, env_kwargs: dict, n_envs: int = os.cpu_count() or 1, GUI=False
+    ) -> VecMonitor:
+        # env_args = set(
+        #    inspect.signature(environment).parameters.keys()
+        # )  # Get the valid argument names of the function
+        n_envs = n_envs if not GUI else 1
+        # print("Limitting n envs because 16 is too much for the cpu")
+        n_envs = 4 if n_envs > 4 else n_envs
+
+        print("n_envs:", n_envs)
+        env_kwargs["GUI"] = GUI
+        env_args = ["dome_radius", "rl_frequency", "GUI"]
+        print("env_args", env_args)
+        valid_env_kwargs = {
+            key: value for key, value in env_kwargs.items() if key in env_args
+        }
+
+        print(env_kwargs)
+
+        print("Valid environment kwargs:")
+        pprint(valid_env_kwargs)
+
+        env_fns = [lambda: environment(**valid_env_kwargs) for _ in range(n_envs)]
+
+        vectorized_environment = DummyVecEnv(env_fns)  # type: ignore
         return VecMonitor(vectorized_environment)
 
     @staticmethod
