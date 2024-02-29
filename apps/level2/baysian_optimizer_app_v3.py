@@ -79,6 +79,7 @@ def objective(
 
     suggestions["avg_score"] = avg_score
     suggestions["std_deviation"] = std_deviation
+    suggestions["trial_number"] = trial.number
 
     ReinforcementLearningPipeline.save_results_to_excel(
         output_folder, f"results_{study_name}.xlsx", suggestions

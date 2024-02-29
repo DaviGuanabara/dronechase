@@ -209,10 +209,10 @@ def directories(study_name: str):
 
 def main():
     print("EXP03 - Air Combat - 1RL and 1BT")
-    n_trials = 10
+    n_trials = 50
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"31_01_2024_level4_{n_timesteps_in_millions:.2f}M_exp03_vFinal"
+    study_name = f"04_02_2024_level4_{n_timesteps_in_millions:.2f}M_exp03_vFinal_p1"
 
     print("Baysian Optimizer App - V2")
     print(f"number of trials: {n_trials}")

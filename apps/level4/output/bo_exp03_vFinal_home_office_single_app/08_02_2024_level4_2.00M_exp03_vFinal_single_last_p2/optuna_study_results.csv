@@ -1,0 +1,3 @@
+number,value,params_batch_size,params_exponent,params_feature_dim,params_hiddens_1,params_hiddens_2,params_hiddens_3,params_rl_frequency,state
+0,3682.900634765625,2048,-4,512,128,256,512,15,COMPLETE
+1,6402.06201171875,2048,-4,512,128,256,512,15,COMPLETE

@@ -61,9 +61,19 @@ class EntitiesManager:
         self,
         positions: np.ndarray,
         quadcopter_type: EntityType,
-        name: str = "no_name",
+        names: Union[
+            List[str], str
+        ] = "no_name",  # Accept either a list of strings or a single string
         lidar_radius: float = 5,
     ) -> List[Quadcopter]:
+        # Check if names is a list, if not, convert it to a list
+        if not isinstance(names, list):
+            names = [names]
+
+        # Ensure names list is the same size as positions, filling gaps with "quadcopter"
+        if len(names) < len(positions):
+            names.extend(["quadcopter"] * (len(positions) - len(names)))
+
         instantiator = (
             Quadcopter.spawn_loyalwingman
             if quadcopter_type == EntityType.LOYALWINGMAN
@@ -71,11 +81,13 @@ class EntitiesManager:
         )
 
         drones = []
-        for position in positions:
+        for i, position in enumerate(positions):
             drone = instantiator(
                 self.simulation,
                 position,
-                name,
+                (
+                    names[i] if i < len(names) else "quadcopter"
+                ),  # Use names list, default to "quadcopter" if out of bounds
                 debug_on=False,
                 lidar_on=True,
                 lidar_radius=lidar_radius,
@@ -88,10 +100,13 @@ class EntitiesManager:
         return drones
 
     def spawn_pursuer(
-        self, positions: np.ndarray, name: str = "no_name", lidar_radius: float = 5
+        self,
+        positions: np.ndarray,
+        names: Union[List[str], str] = "no_name",
+        lidar_radius: float = 5,
     ) -> List[Quadcopter]:
         return self.spawn_quadcopter(
-            positions, EntityType.LOYALWINGMAN, name, lidar_radius
+            positions, EntityType.LOYALWINGMAN, names, lidar_radius
         )
 
     def spawn_invader(
@@ -110,7 +125,8 @@ class EntitiesManager:
         )
 
     def spawn_protected_building(self):
-        self.building = ImmovableStructures.spawn_building(self.simulation, [0, 0, 0])
+        # self.building = ImmovableStructures.spawn_building(self.simulation, [0, 0, 0])
+        pass
 
     # ===========================================================================
     # Get Quadcopters
@@ -143,6 +159,9 @@ class EntitiesManager:
             if self.filter_expression(drone, quadcopter_type, armed, id)
         ]
 
+    def get_all(self) -> "list[Quadcopter]":
+        return list(self.drone_registry.values())
+
     def get_armed_invaders(self) -> "list[Quadcopter]":
         return self.get_quadcopters(
             quadcopter_type=EntityType.LOITERINGMUNITION, armed=True
@@ -160,6 +179,9 @@ class EntitiesManager:
         return self.get_quadcopters(
             quadcopter_type=EntityType.LOYALWINGMAN, armed=False
         )
+
+    def get_all_armed(self) -> "list[Quadcopter]":
+        return self.get_quadcopters(armed=True)
 
     def get_all_invaders(self) -> "list[Quadcopter]":
         return self.get_quadcopters(quadcopter_type=EntityType.LOITERINGMUNITION)

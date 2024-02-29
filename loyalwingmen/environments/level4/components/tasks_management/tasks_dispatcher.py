@@ -27,6 +27,8 @@ from .tasks.exp03_vFinal_task import Exp03_vFinal_Task
 from .tasks.exp04_vFinal_task import Exp04_vFinal_Task
 from .tasks.exp05_vFinal_task import Exp05_vFinal_Task
 
+from .tasks.evaluation_task import Evaluation_Task
+
 
 class TasksDispatcher:
     @staticmethod
@@ -100,3 +102,9 @@ class TasksDispatcher:
     @staticmethod
     def exp05_vFinal(dome_radius, quadcopter_manager) -> "list[Task]":
         return [Exp05_vFinal_Task(quadcopter_manager, dome_radius)]
+
+    @staticmethod
+    def evaluation_vFinal(
+        dome_radius, quadcopter_manager, configuration
+    ) -> "list[Task]":
+        return [Evaluation_Task(quadcopter_manager, dome_radius, configuration)]

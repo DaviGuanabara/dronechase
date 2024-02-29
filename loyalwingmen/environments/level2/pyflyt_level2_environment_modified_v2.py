@@ -60,7 +60,7 @@ class PyflytL2EnviromentModifiedV2(Env):
             1, np.array([invader_position]), "invader"
         )
         self.quadcopter_manager.spawn_pursuer(
-            2, np.array([-invader_position, [3, 3, 3]]), "pursuer"
+            2, np.array([-invader_position, [3, 3, 3]]), "Loyal Wingman"
         )
 
         # Esse é

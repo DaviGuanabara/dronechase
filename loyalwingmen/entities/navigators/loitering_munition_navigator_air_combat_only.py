@@ -86,6 +86,7 @@ class KamikazeNavigator(Navigator):
                 return False
 
         # return True
+        # ALWAYS FALSE. This is a hack to make the kamikaze go directly to the AGENTS, making air combat only.
         return False
 
     def _are_wingmen_alive(self, offset_handler) -> bool:

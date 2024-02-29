@@ -107,15 +107,15 @@ def suggest_parameters(trial: Trial) -> dict:
     #    for i in range(1, n_hiddens + 1)
     # }
 
-    suggestions["hidden_1"] = trial.suggest_categorical("hidden_1", [256])
+    suggestions["hidden_1"] = trial.suggest_categorical("hidden_1", [128])
     suggestions["hidden_2"] = trial.suggest_categorical("hidden_2", [256])
-    suggestions["hidden_3"] = trial.suggest_categorical("hidden_3", [256])
+    suggestions["hidden_3"] = trial.suggest_categorical("hidden_3", [512])
 
     suggestions["rl_frequency"] = trial.suggest_categorical(
         "frequency", [15]  # [1, 5, 10, 15, 30]
     )
     suggestions["learning_rate"] = 10 ** trial.suggest_int("exponent", -3, -3)
-    suggestions["batch_size"] = trial.suggest_categorical("batch_size", [128])
+    suggestions["batch_size"] = trial.suggest_categorical("batch_size", [256])
     suggestions["features_dim"] = trial.suggest_categorical("feature_dim", [512])
     return suggestions
 
@@ -236,7 +236,7 @@ def directories(study_name: str):
 def main():
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"level2_{n_timesteps_in_millions:.2f}M_14.01.2023_baysian_v_old_v2_p4"
+    study_name = f"level2_{n_timesteps_in_millions:.2f}M_10.02.2023_baysian_v_old_v2_10x_single_p2"
 
     models_dir, logs_dir, output_folder = directories(study_name)
 
@@ -252,7 +252,7 @@ def main():
             models_dir=models_dir,
             logs_dir=logs_dir,
         ),
-        n_trials=10,
+        n_trials=3,
     )
 
 

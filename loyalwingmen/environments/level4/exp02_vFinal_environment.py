@@ -86,6 +86,9 @@ class Exp02vFinalEnvironment(Env):
         self.last_action = np.zeros(4)
         self.step_counter = 0
 
+        self.last_positions = {}
+        self.last_last_positions = {}
+
     def init_components(self, dome_radius, GUI):
         self.simulation = L4AviarySimulation(world_scale=dome_radius, render=GUI)
         self.entities_manager = EntitiesManager()
@@ -165,6 +168,7 @@ class Exp02vFinalEnvironment(Env):
         # info = self.compute_info()
 
         self.task_progression.on_step_end()
+
         return observation, reward, terminated, truncated, info
 
     def advance_step(self):

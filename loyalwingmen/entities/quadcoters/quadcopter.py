@@ -346,6 +346,7 @@ class Quadcopter:
     def replace(self, position: np.ndarray, attitude: np.ndarray):
         quaternion = self.simulation.getQuaternionFromEuler(attitude)
         self.simulation.resetBasePositionAndOrientation(self.id, position, quaternion)
+        self.formation_position = position
         if self._armed:
             self.update_imu()
 
@@ -367,6 +368,7 @@ class Quadcopter:
         # self.reset()
 
         # self.quadx.reset()
+        self.gun.reset()
 
     def disarm(self):
         self.simulation.changeDynamics(self.id, -1, mass=0)
@@ -380,7 +382,7 @@ class Quadcopter:
         self.messageHub.terminate(self.id)
         self.update_color()
 
-        self.gun.reset()
+        # self.gun.reset()
         self.quadx.body.reset()
         self.quadx.motors.reset()
         self.quadx.setpoint = np.zeros(4)

@@ -249,7 +249,7 @@ class Exp05_vFinal_Task(Task):
 
         for pursuer in pursuers[1:]:
             observation = self.compute_lw_observation(pursuer)
-            action, _states = driver.predict(observation)
+            action, _states = driver.predict(observation, deterministic=True)
             self.last_action: np.ndarray = action
             pursuer.drive(action)
 
@@ -681,7 +681,7 @@ class Exp05_vFinal_Task(Task):
     def replace_pursuers(self):
         # self.entities_manager.disarm_all()
         pursuers = self.entities_manager.get_all_pursuers()
-        positions = self.pursuers_positions  # self.generate_positions(len(pursuers), 1)
+        positions = self.generate_positions(len(pursuers), 2)
         self.entities_manager.replace_quadcopters(pursuers, positions)
 
     def spawn_invader_squad(self):

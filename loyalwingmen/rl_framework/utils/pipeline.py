@@ -31,7 +31,11 @@ from pprint import pprint
 class ReinforcementLearningPipeline:
     @staticmethod
     def create_vectorized_environment(
-        environment, env_kwargs: dict, n_envs: int = os.cpu_count() or 1, GUI=False
+        environment,
+        env_kwargs: dict,
+        n_envs: int = os.cpu_count() or 1,
+        GUI=False,
+        env_args=None,
     ) -> VecMonitor:
         # env_args = set(
         #    inspect.signature(environment).parameters.keys()
@@ -39,7 +43,9 @@ class ReinforcementLearningPipeline:
         n_envs = n_envs if not GUI else 1
         print("n_envs:", n_envs)
         env_kwargs["GUI"] = GUI
-        env_args = ["dome_radius", "rl_frequency", "GUI"]
+        env_args = (
+            ["dome_radius", "rl_frequency", "GUI"] if env_args is None else env_args
+        )
         print("env_args", env_args)
         valid_env_kwargs = {
             key: value for key, value in env_kwargs.items() if key in env_args

@@ -527,7 +527,11 @@ class Exp02_V2_Task(Task):
 
         self.pursuers_positions = positions
         pursuers = self.entities_manager.spawn_pursuer(
-            positions, "pursuer", lidar_radius=2 * self.dome_radius
+            positions, "Loyal Wingman", lidar_radius=2 * self.dome_radius
+        )
+
+        pursuers = self.entities_manager.spawn_pursuer(
+            positions, "Loyal Wingman 2", lidar_radius=2 * self.dome_radius
         )
 
         for pursuer in pursuers:

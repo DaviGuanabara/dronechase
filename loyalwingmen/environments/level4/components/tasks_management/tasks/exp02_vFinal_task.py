@@ -103,7 +103,7 @@ class Exp02_vFinal_Task(Task):
         self.PURSUER_SHOOT_RANGE = 1
 
         self.STEP_INCREMENT = 100  # Increment 6 seconds in time for each kill
-        self.MAX_STEP = 300  # 300 calls = 20 seconds for rl_frequency = 15
+        self.MAX_STEP = 300  # calls = 20 seconds for rl_frequency = 15
 
         # self.building_position = np.array([0, 0, 1])
 
@@ -616,7 +616,7 @@ class Exp02_vFinal_Task(Task):
     def replace_pursuers(self):
         # self.entities_manager.disarm_all()
         pursuers = self.entities_manager.get_all_pursuers()
-        positions = self.pursuers_positions  # self.generate_positions(len(pursuers), 1)
+        positions = self.generate_positions(len(pursuers), 2)
         self.entities_manager.replace_quadcopters(pursuers, positions)
 
     def spawn_invader_squad(self):

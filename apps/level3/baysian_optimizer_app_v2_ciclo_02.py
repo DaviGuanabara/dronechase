@@ -141,7 +141,7 @@ def rl_pipeline(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # path_lib = Path("from_level_2/mPPO-r4985.2099609375-sd1149.3851318359375.zip")
     print("Melhor do Level 3 Ciclo 1: ")
-
+    print("Trial 1 do Homeoffice mas deixei no Trial 8 nos experimentos.")
     path_lib = Path(
         # "C:\\Users\\davi_\\OneDrive\\1. Projects\\1. Dissertação\\01 - Code\\Experiment Results\\Etapa 01\\level2_2.00M_14.01.2023_baysian_v_old_v2_multi_topology_p3_mac\\Trial_4\\models_dir\\h[128, 256, 512]_f15_lr0.001\\t0_PPO_r8861.86.zip"
         # "C:\\Users\\davi_\\OneDrive\\1. Projects\\1. Dissertação\\01 - Code\\Experiment Results\\Etapa 02\\Ciclo 01\\15_01_2023_level3_2.00M_v2_best_of_level2__6_m_limited_p8_mac\\Trial_3\\models_dir\\h[128, 256, 512]_f15_lr1e-05\\t3_PPO_r1360.74.zip"
