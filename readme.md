@@ -77,7 +77,6 @@ This environment is structured to create a simulation where two entities interac
 
 This environment is structured with compatibility in mind, particularly with the Stable Baselines 3 reinforcement learning framework.
 
-## CTEDS pybullet Environment - Level 1: Cooperative Threat Engagement with Heterogeneous Drone Swarm
 
 **Purpose**: The primary focus is on "loyal wingmen" quadcopters defending structures from threats embodied by loitering munitions. Key architectural features include:
 
