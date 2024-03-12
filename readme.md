@@ -1,4 +1,4 @@
-This project was made for a dissertation. If you have any questions, do not hesitate to contact me.
+This manual is still being written. If you have any questions, do not hesitate to contact me.
 I want to start by apologizing for a mess code, typos, or any library missing. It will be improved soon.
 This project was inspired in PyFlyt https://github.com/jjshoots/PyFlyt (I had mistakenly imported its whole project into the folder PyFlyt. In fact, I only need the QuadX library. This dependency will be fixed soon.)
 
