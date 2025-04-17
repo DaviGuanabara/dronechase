@@ -1,4 +1,0 @@
-NumPy==1.24
-wheel
-pyflyt
-matplotlib

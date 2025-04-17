@@ -1,3 +1,0 @@
-The quadcopter class was made to wrap the Quadx class and previne its modification. The issue starts in the design choice: Quadx is mix responsabilities, like garthering intertial information and controlling the motors. The quadcopter class was made aiming to separete this responsabilities. In this manner, multiples interfaces of QuadX have been made separete those concerns and used in the Quadcopter Class. Although this can be more verbose and less efficient, it preserves the QuadX design and allows the Quadcopter class to be more flexible.
-
-So, IMU class uses the QuadX class to calculate the inertial information needed to control the quadcopter.

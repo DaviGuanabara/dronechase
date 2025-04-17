@@ -27,6 +27,16 @@ load.py: here, the model generated from learn.py will be executed.
 
 in the main folder:
 
+(previeously, install visual-cpp-build-tools
+
+Desenvolvimento para desktop com C++
+ MSVC v14.x build tools
+ Windows 10 SDK
+ C++ CMake tools for Windows
+
+ )
+
+
 ```shell
 pip install -e .
 ```
