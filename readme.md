@@ -1,15 +1,18 @@
+
 # Dronechase
 
 **Dronechase** is a multi-stage simulation framework for training autonomous aerial agents in defense scenarios using Deep Reinforcement Learning (DRL). The project focuses on **loyal wingmen drones** engaging loitering munitions in a 3D physics-based environment powered by PyBullet.
+
+Developed as part of a Master’s thesis in Aeronautical Computing at ITA.
 
 ---
 
 ## 🚀 Project Overview
 
-- 🧠 **Reinforcement Learning** with Stable Baselines3
-- 📡 **3D Simulation** using PyFlyt and PyBullet
-- 🛰️ **Loyal Wingmen vs. Loitering Munitions**
-- 🧪 **Curriculum-style training stages (stage01 → stage03)**
+- 🧠 **Reinforcement Learning** with Stable Baselines3  
+- 📡 **3D Simulation** using PyFlyt and PyBullet  
+- 🛰️ **Loyal Wingmen vs. Loitering Munitions**  
+- 🧪 **Curriculum-style training stages (stage01 → stage03)**  
 
 Each stage increases environmental complexity and decision-making requirements.
 
@@ -33,7 +36,7 @@ src/
 
 ## ⚙️ Installation
 
-Make sure you have C++ build tools installed (e.g., MSVC v14+, CMake, Windows SDK). Then run:
+Ensure you have C++ build tools installed (e.g., MSVC v14+, CMake, Windows SDK). Then:
 
 ```bash
 git clone https://github.com/DaviGuanabara/dronechase.git
@@ -41,7 +44,8 @@ cd dronechase
 poetry install --all-extras
 ```
 
-> 📦 Optional extras: `poetry install --extras "viz"` (includes Seaborn and TensorBoard)
+> 📦 Optional extras:  
+> `poetry install --extras "viz"` (includes Seaborn and TensorBoard)
 
 ---
 
@@ -55,7 +59,7 @@ Example:
 poetry run python apps/stage01/train.py
 ```
 
-Each stage is independent and corresponds to a specific experimental setup described in the dissertation.
+Each stage corresponds to an experimental setup described in the academic dissertation.
 
 ---
 
@@ -65,14 +69,21 @@ Each stage is independent and corresponds to a specific experimental setup descr
 
 **"Deep Reinforcement Learning Applied to Threat Engagement for Loyal Wingmen Drones"**  
 Davi Guanabara Aragão – M.Sc. in Aeronautical Computing, ITA, 2024  
-📎 [Access via ITA Library (login required)](http://www.bdita.bibl.ita.br/)  
----
+📎 [Access via ITA Library (login required)](http://www.bdita.bibl.ita.br/)
 
 ### 📝 Scientific Article
 
 **"Deep Reinforcement Learning Applied for Threat Engagement by Loyal Wingmen Drones"**  
 Accepted at IEEE SBR/WRE 2024  
-📎 [Access on IEEE Xplore](https://ieeexplore.ieee.org/document/10837749)  
+📎 [View on IEEE Xplore](https://ieeexplore.ieee.org/document/10837749)
+
+---
+
+### 📁 Pretrained Models
+
+All pretrained models used in the dissertation are available here:  
+🔗 [OneDrive – Model Outputs](https://1drv.ms/f/c/1d0046dc1ae1123c/EjwS4RrcRgAggB0mxAYAAAABv3y_2LSkT8CMERe7Hf5ZXA?e=KYmCQj)
+
 ---
 
 ## ✈️ Citation
@@ -91,4 +102,3 @@ If you use this project, please cite:
   keywords={Laser radar;Weapons;Conferences;Education;Decision making;Deep reinforcement learning;Vehicle dynamics;Robots;Optimization;Drones;Machine Learning;Neural Network;Unmanned Aerial Vehicle;Air Defense System},
   doi={10.1109/SBR/WRE63066.2024.10837749}}
 ```
-
