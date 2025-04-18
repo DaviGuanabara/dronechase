@@ -1,120 +1,9 @@
-# vim
-.vim/
-
-# pypi credentials
-.pyirc
-
-# crazyflie cache
-cache/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
+# Python virtual environments
 .env
 .venv
 env/
@@ -123,94 +12,63 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
+# Output files
+*.prof
+*.tmp
+*.run
+*.npz
+*.xlsx
+
+# Logs, caches, tensorboard
+*.log
+*.monitor.csv
+*.tfevents.*
+.cache/
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+.coverage*
+
+# Type checking tools
+.mypy_cache/
+.pytype/
+.pyre/
+.dmypy.json
+
+# IDEs and project configs
+.vscode/
+.idea/
+.ropeproject/
 .spyderproject
 .spyproject
 
-# Rope project settings
-.ropeproject
+# Jupyter notebooks
+.ipynb_checkpoints
 
-# mkdocs documentation
-/site
+# Documentation builds
+docs/_build/
+_build/
+site/
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
+wheels/
+share/python-wheels/
 
-# Pyre type checker
-.pyre/
+# ThreatEngage experiment outputs
+apps/stage*/output/
+apps/stage3/experiments/*/output/
 
-# pytype static type analyzer
-.pytype/
+# Local training results (custom)
+apps/**/output/*.zip
+apps/**/output/*.npz
+apps/**/output/*.json
 
-# Cython debug symbols
-cython_debug/
-
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[128, 128, 128\]-f15-lr1e-05/mPPO-r-11769600.0-sd8598927.0.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[128, 128, 256\]-f15-lr0.001/mPPO-r-1961.1492919921875-sd177.9661102294922.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[128, 128, 512\]-f15-lr0.001/mPPO-r-9115.630859375-sd3654.4638671875.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[128, 256, 256\]-f15-lr0.001/mPPO-r-1895398.5-sd2666624.25.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[128, 256, 512\]-f15-lr0.0001/mPPO-r-3761.797607421875-sd716.2897338867188.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[256, 128, 128\]-f15-lr0.001/mPPO-r-3263.862060546875-sd530.480712890625.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[256, 256, 128\]-f15-lr0.001/mPPO-r-1723.5673828125-sd185.44451904296875.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[256, 256, 512\]-f15-lr0.0001/mPPO-r-14422.9560546875-sd14643.8291015625.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[256, 512, 128\]-f15-lr0.001/mPPO-r-3689.874267578125-sd233.99252319335938.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[256, 512, 256\]-f15-lr0.001/mPPO-r-35459.59765625-sd21870.61328125.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[256, 512, 512\]-f15-lr0.001/mPPO-r-1835.2301025390625-sd94.0248031616211.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[512, 512, 256\]-f15-lr1e-05/mPPO-r-22240138.0-sd15929658.0.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/models_dir/h\[512, 512, 512\]-f15-lr1e-05/mPPO-r-62157.33203125-sd40063.10546875.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_1.00M_18.10.2023/results_level3_1.00M_18.10.2023.xlsx
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/logs_dir/h\[128, 256, 256\]-f15-lr0.0001/evaluations.npz
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/logs_dir/h\[128, 256, 512\]-f15-lr0.0001/evaluations.npz
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/logs_dir/h\[256, 128, 128\]-f15-lr0.001/evaluations.npz
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/logs_dir/h\[256, 512, 128\]-f15-lr0.001/evaluations.npz
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/logs_dir/h\[512, 128, 128\]-f15-lr0.0001/evaluations.npz
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/logs_dir/h\[512, 512, 512\]-f15-lr0.0001/evaluations.npz
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[128, 256, 256\]-f15-lr0.0001/best_model.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[128, 256, 256\]-f15-lr0.0001/mPPO-r-3049.106689453125-sd482.1896667480469.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[128, 256, 512\]-f15-lr0.0001/best_model.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[128, 256, 512\]-f15-lr0.0001/mPPO-r-2653.4765625-sd135.13526916503906.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[256, 128, 128\]-f15-lr0.001/best_model.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[256, 128, 128\]-f15-lr0.001/mPPO-r-2787.4892578125-sd410.6653747558594.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[256, 512, 128\]-f15-lr0.001/best_model.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[256, 512, 128\]-f15-lr0.001/mPPO-r-2390.949951171875-sd505.6891174316406.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[512, 128, 128\]-f15-lr0.0001/best_model.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[512, 128, 128\]-f15-lr0.0001/mPPO-r-3203.5771484375-sd415.2882385253906.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[512, 512, 512\]-f15-lr0.0001/best_model.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/models_dir/h\[512, 512, 512\]-f15-lr0.0001/mPPO-r-1730.8736572265625-sd72.58047485351562.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_2.00M_18.10.2023/results_level3_2.00M_18.10.2023.xlsx
-apps/level3/result_with_lidar.prof
-apps/level3/ppo_level3_lidar.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/results_level3_0.50M_13.11.2023.xlsx
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[512, 512, 512\]-f15-lr0.001/mPPO-r1044.267333984375-sd50.94416046142578.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[512, 256, 256\]-f15-lr0.0001/mPPO-r-188.9700469970703-sd1071.6800537109375.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[512, 256, 128\]-f15-lr1e-05/mPPO-r-6039.3515625-sd1108.619384765625.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[256, 512, 512\]-f15-lr1e-05/mPPO-r-336.41845703125-sd941.091796875.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[256, 512, 512\]-f15-lr0.001/mPPO-r834.7778930664062-sd957.1555786132812.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 512, 512\]-f15-lr0.0001/mPPO-r-510.5843200683594-sd878.9794921875.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 512, 256\]-f15-lr0.0001/mPPO-r-2858.219482421875-sd1022.2105712890625.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 256, 512\]-f15-lr0.001/mPPO-r1236.7200927734375-sd136.3643341064453.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 256, 256\]-f15-lr0.001/mPPO-r-1447.7684326171875-sd164.38037109375.zip
-apps/level3/output_level3/baysian_optimizer_app/level3_0.50M_13.11.2023/models_dir/h\[128, 128, 128\]-f15-lr0.0001/mPPO-r948.256103515625-sd139.45851135253906.zip
-apps/level3/mPPO-r-668-intel-15.11.2023.zip
-apps/level3/mPPO-r-668-intel-15.11.2023-lw1-lm1.zip
-*.prof
-*.zip
-*.xlsx
-*.npz
-*.0
-*.0
-*.8
-*.1
-*.1
-*.2
-*.4
-*.7
-*.11
-*.9
-*.6
-*.10
-*.3
-*.5
-*.prof
+# Conda environment metadata (if exists)
+.conda/

@@ -1,2 +1,0 @@
-O ciclo 1 usou somente 300 steps como máximo. O ciclo 2 passou a usar 600 Steps. Isso foi devido ao fato de que tinha aindamuita coisa que aindamuito
-agent poderia fazer mas o episódio estava se encerrando. ou seja, encerrando prematuramente. Treinar o ciclo 2 com 300 steps é deixar com que o treinmaento fique lateralizado

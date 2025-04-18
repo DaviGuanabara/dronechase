@@ -1,15 +1,32 @@
-[tool.poetry]
+[project]
 name = "dronechase"
 version = "0.1.0"
-description = "Deep Reinforcement applyed to loyal wingmen drones"
-authors = ["DaviGuanabara <davi_guanabara@live.com>"]
+description = "Deep Reinforcement Learning Applied for Threat Engagement"
+authors = [
+    {name = "DaviGuanabara",email = "davi_guanabara@live.com"}
+]
 readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "stable-baselines3 (>=2.6.0,<3.0.0)",
+    "pyflyt (==0.11.1)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "optuna (>=4.3.0,<5.0.0)"
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-pyflyt = "^0.29.0"
 
+[project.optional-dependencies]
+viz = [
+    "seaborn (>=0.13.2,<0.14.0)",
+    "tensorboard (>=2.19.0,<3.0.0)"
+]
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+  { include = "threatengage", from = "src" },
+  { include = "threatsense", from = "src" }
+]
