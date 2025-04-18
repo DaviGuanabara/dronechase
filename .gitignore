@@ -1,9 +1,9 @@
-# Byte-compiled / optimized / DLL files
+# Bytecode e compilados
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Python virtual environments
+# Ambientes virtuais
 .env
 .venv
 env/
@@ -11,47 +11,43 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.conda/
 
-# Output files
+# Saídas de experimentos
+apps/**/output/
+*.zip
+*.npz
+*.json
+*.xlsx
 *.prof
 *.tmp
 *.run
-*.npz
-*.xlsx
-
-# Logs, caches, tensorboard
-*.log
 *.monitor.csv
 *.tfevents.*
+
+# Caches e ferramentas de teste
 .cache/
 .pytest_cache/
-.tox/
-.nox/
-htmlcov/
-.coverage*
-
-# Type checking tools
 .mypy_cache/
 .pytype/
 .pyre/
 .dmypy.json
+.coverage*
+.tox/
+.nox/
+htmlcov/
 
-# IDEs and project configs
+# IDEs e configs locais
 .vscode/
 .idea/
 .ropeproject/
 .spyderproject
 .spyproject
 
-# Jupyter notebooks
+# Jupyter
 .ipynb_checkpoints
 
-# Documentation builds
-docs/_build/
-_build/
-site/
-
-# Distribution / packaging
+# Builds e distribuição
 build/
 dist/
 *.egg-info/
@@ -61,14 +57,7 @@ MANIFEST
 wheels/
 share/python-wheels/
 
-# ThreatEngage experiment outputs
-apps/stage*/output/
-apps/stage3/experiments/*/output/
-
-# Local training results (custom)
-apps/**/output/*.zip
-apps/**/output/*.npz
-apps/**/output/*.json
-
-# Conda environment metadata (if exists)
-.conda/
+# Documentação (Sphinx, MkDocs, etc)
+docs/_build/
+_build/
+site/
