@@ -41,22 +41,22 @@ Ensure you have C++ build tools installed (e.g., MSVC v14+, CMake, Windows SDK).
 ```bash
 git clone https://github.com/DaviGuanabara/dronechase.git
 cd dronechase
-poetry install --all-extras
+pip install --all-extras
 ```
 
 > 📦 Optional extras:  
-> `poetry install --extras "viz"` (includes Seaborn and TensorBoard)
+> `pip install --extras "viz"` (includes Seaborn and TensorBoard)
 
 ---
 
 ## 📦 How to Use
 
-Navigate to the `apps/` folder and run the appropriate training or evaluation script for each stage.
+Navigate to the `apps/` folder and run each stage's appropriate training or evaluation script.
 
 Example:
 
 ```bash
-poetry run python apps/stage01/train.py
+python apps/stage01/train.py
 ```
 
 Each stage corresponds to an experimental setup described in the academic dissertation.
