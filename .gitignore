@@ -61,3 +61,4 @@ share/python-wheels/
 docs/_build/
 _build/
 site/
+*.code-workspace
