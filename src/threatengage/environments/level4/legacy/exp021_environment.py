@@ -1,25 +1,25 @@
 import numpy as np
 
-from ...notification_system.topics_enum import Topics_Enum
+from ....notification_system.topics_enum import Topics_Enum
 from typing import Dict
 from gymnasium import spaces, Env
 from pynput.keyboard import Key, KeyCode
 from collections import defaultdict
 
-from .components.simulation.level4_simulation import L4AviarySimulation
-from .components.entities_management.entities_manager import (
+from ..components.simulation.level4_simulation import L4AviarySimulation
+from ..components.entities_management.entities_manager import (
     EntitiesManager,
     Quadcopter,
 )
 
-from .components.tasks_management.task_progression import TaskProgression
-from .components.tasks_management.tasks_dispatcher import TasksDispatcher
+from ..components.tasks_management.task_progression import TaskProgression
+from ..components.tasks_management.tasks_dispatcher import TasksDispatcher
 
-from .components.utils.normalization import normalize_inertial_data
+from ..components.utils.normalization import normalize_inertial_data
 
 
 # from .components.tasks_management.stages import L3Stage1 as Stage1
-from ...notification_system.message_hub import MessageHub
+from ....notification_system.message_hub import MessageHub
 
 
 class Exp021Environment(Env):

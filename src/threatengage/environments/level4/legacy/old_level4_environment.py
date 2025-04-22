@@ -1,35 +1,29 @@
 import numpy as np
 
-from ...notification_system.topics_enum import Topics_Enum
+
 from typing import Dict
 from gymnasium import spaces, Env
-from pynput.keyboard import Key, KeyCode
-from collections import defaultdict
+from ....notification_system.topics_enum import Topics_Enum
 
-from .components.simulation.level4_simulation import L4AviarySimulation
-from .components.entities_management.entities_manager import (
+from ..components.simulation.level4_simulation import L4AviarySimulation
+from ..components.entities_management.entities_manager import (
     EntitiesManager,
     Quadcopter,
 )
 
-from .components.tasks_management.task_progression import TaskProgression
-from .components.tasks_management.tasks_dispatcher import TasksDispatcher
-
-from .components.utils.normalization import normalize_inertial_data
+from ..components.tasks_management.task_progression import TaskProgression
+from ..components.tasks_management.tasks_dispatcher import TasksDispatcher
+from ..components.utils.normalization import normalize_inertial_data
 
 
 # from .components.tasks_management.stages import L3Stage1 as Stage1
-from ...notification_system.message_hub import MessageHub
+from ....notification_system.message_hub import MessageHub
 
 
-class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
+class PyflytL4Enviroment(Env):
     """
-    This class aims to demonstrate a environment with one Loyal Wingmen (CONTROLLED BY AN THE RL AGENT.
-    THIS CODE IS PREPARED TO RECEIVE MULTIPLE LOYALWINGMEN, WITH THE FIRST BEING CONTROLLED BY RL AGENT, AND THE FOLLOWING BEING CONTROLLED BY
-    BEHAVIOR TREE). and an linearly increasing number of Loitering Munition, starting by one. It is diveded by waves.
-    Each wave has a number of Loitering Munition equal to the wave number.
-    The Loyal Wingmen must to destroy all Loitering Munition before the next wave starts. Loyalwingman has a limited number of bullets, 20,
-    limiting the number of waves up to 6 (6 waves means 21 loitering munitions engaged).
+    This class aims to demonstrate a environment with one Loyal Wingmen and one Loitering Munition,
+    in a simplest way possible.
     It was developed for Stable Baselines 3 2.0.0 or higher.
     Gym Pybullet Drones was an inspiration for this project. For more: https://github.com/utiasDSL/gym-pybullet-drones
 
@@ -38,20 +32,19 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
 
     def __init__(
         self,
-        dome_radius: float = 20,
+        dome_radius: float = 8,
         rl_frequency: int = 15,
         GUI: bool = False,
     ):
         """Initialize the environment."""
-        print("pyflyt level 4 environment init")
 
-        self.init_constants(dome_radius, rl_frequency, GUI)
         self.init_components(dome_radius, GUI)
         self.frequency_adjustments(rl_frequency)
-
+        self.init_constants(dome_radius, rl_frequency, GUI)
         self.init_globals()
 
         self.setup_static_entities()
+        print("pyflyt level 4 environment init")
 
         # self.step_counter = 0
         self.task_progression.on_env_init()
@@ -60,6 +53,8 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
         self.observation_space = self._observation_space()
 
     def setup_static_entities(self):
+        # TODO: Here i create the ground and the protected building.
+        # I must to test it.
         entities_manager = self.entities_manager
         entities_manager.spawn_ground(self.dome_radius)
         entities_manager.spawn_protected_building()
@@ -93,10 +88,8 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
         self.entities_manager.setup_debug(self.debug_on)
 
         self.task_progression = TaskProgression(
-            TasksDispatcher.exp04(self.dome_radius, self.entities_manager)
+            TasksDispatcher.level4(self.dome_radius, self.entities_manager)
         )
-
-        self.setup_messange_hub()
 
         # plane_id = self.simulation.loadURDF("plane.urdf", basePosition=[0, 0, 0])
         # self.simulation.changeDynamics(plane_id, -1, mass=0)
@@ -142,14 +135,9 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
         info = self.compute_info()
         return observation, info
 
-    # TODO: I have to work on this method.
-    # the action should go only to the RL Agent. And the other entities should be controlled by the task class.
-    def step(self, rl_action: np.ndarray = np.array([0, 0, 0, 0])):
+    def step(self, rl_action: np.ndarray):
         self.last_action: np.ndarray = rl_action
 
-        # TODO: Basically, i have to create a function in entities_manager that returns the RL Agent.
-        # And it needs to be separeted from other entities. Maybe, i just need to create a quadcopter_type called RL Agent.
-        # Or add another variable. I don't know yet.
         pursuer = self.entities_manager.get_all_pursuers()[0]
         pursuer.drive(rl_action, self.show_name_on)
 
@@ -158,11 +146,10 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
         self.advance_step()
 
         reward, terminated = self.task_progression.on_step_middle()
-        info = self.task_progression.compute_info()
 
         observation = self.compute_observation()
         truncated = False
-        # info = self.compute_info()
+        info = self.compute_info()
 
         self.task_progression.on_step_end()
         return observation, reward, terminated, truncated, info
@@ -201,7 +188,7 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
         pursuer.update_lidar()
 
         inertial_data: np.ndarray = self.process_inertial_state(pursuer)
-        pursuer.lidar_data
+        # pursuer.lidar_data
 
         lidar: np.ndarray = pursuer.lidar_data.get(
             "lidar",
@@ -213,15 +200,11 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
 
         gun_state = pursuer.gun_state
 
-        inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0).astype(
-            np.float32
-        )
-
         return {
             "lidar": lidar.astype(np.float32),
-            "inertial_data": inertial_gun_concat,  # inertial_data.astype(np.float32),
+            "inertial_data": inertial_data.astype(np.float32),
             "last_action": self.last_action.astype(np.float32),
-            # "gun": gun_state.astype(np.float32),
+            "gun": gun_state.astype(np.float32),
         }
 
     def _observation_space(self):
@@ -243,7 +226,15 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
 
         the other elements of the Box() shape varies from -1 to 1.
 
+        Inertial Data is composed by:
+
+        position,
+        velocity,
+        attitude,
+        quaternion,
+        angular_rate,
         """
+
         observation_shape = self.observation_shape()
         return spaces.Dict(
             {
@@ -254,8 +245,8 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
                     dtype=np.float32,
                 ),
                 "inertial_data": spaces.Box(
-                    -np.ones((observation_shape["inertial_data"],)),
-                    np.ones((observation_shape["inertial_data"],)),
+                    -1,
+                    1,
                     shape=(observation_shape["inertial_data"],),
                     dtype=np.float32,
                 ),
@@ -265,26 +256,24 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
-                # "gun": spaces.Box(
-                #    -1,
-                #    1,
-                #    shape=observation_shape["gun"],
-                #    dtype=np.float32,
-                # ),
+                "gun": spaces.Box(
+                    -1,
+                    1,
+                    shape=observation_shape["gun"],
+                    dtype=np.float32,
+                ),
             }
         )
 
     def observation_shape(self) -> dict:
-        pursuer = self.entities_manager.get_all_pursuers()[0]
-
         position = 3
         velocity = 3
         attitude = 3
         angular_rate = 3
-        gun_state = 3
 
-        inertial_data = position + velocity + attitude + angular_rate + gun_state
+        inertial_data = position + velocity + attitude + angular_rate
 
+        pursuer = self.entities_manager.get_all_pursuers()[0]
         lidar_shape = pursuer.lidar_shape
         last_action_shape = 4
 
@@ -294,7 +283,7 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
             "lidar": lidar_shape,
             "inertial_data": inertial_data,
             "last_action": last_action_shape,
-            # "gun": gun_state_shape,
+            "gun": gun_state_shape,
         }
 
     ## Helpers #####################################################################
@@ -322,19 +311,10 @@ class Exp04CooperativeOnlyBTStoppedEnvironment(Env):
     ################################################################################
 
     def get_keymap(self):
-        keycode = KeyCode()
-        default_action = [0, 0, 0, 1]
+        """
+        There is a problem to use 'pynput' in intel servers (Server X not available error). So this function will be placed on test environment.
 
-        key_map = defaultdict(lambda: default_action)
-        key_map.update(
-            {
-                Key.up: [0, 1, 0, 1],
-                Key.down: [0, -1, 0, 1],
-                Key.left: [-1, 0, 0, 1],
-                Key.right: [1, 0, 0, 1],
-                keycode.from_char("e"): [0, 0, 1, 1],
-                keycode.from_char("d"): [0, 0, -1, 1],
-            }
+        """
+        raise Exception(
+            "get_keymap is no longer available on experimental environment. You should use test environment instead (localized in components/test)."
         )
-
-        return key_map
