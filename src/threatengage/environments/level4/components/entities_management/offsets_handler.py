@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from .entities_manager import Quadcopter
+from threatengage.environments.level4.components.entities_management.entities_manager import Quadcopter
 
 
 @dataclass(frozen=True)

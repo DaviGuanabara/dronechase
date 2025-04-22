@@ -6,7 +6,8 @@ import numpy as np
 import pybullet as p
 import pybullet_data
 from pybullet_utils import bullet_client
-from ..entities_management.entities_manager import Quadcopter
+
+from threatengage.environments.level4.components.entities_management.entities_manager import Quadcopter
 
 
 class L4AviarySimulation(bullet_client.BulletClient):

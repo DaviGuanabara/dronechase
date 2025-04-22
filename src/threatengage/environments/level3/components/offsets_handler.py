@@ -1,7 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
-from .quadcopter_manager import QuadcopterManager
-from threatengage.entities.quadcoters.quadcopter import Quadcopter
+
+from threatengage.environments.level3.components.quadcopter_manager import QuadcopterManager
+from core.entities.quadcopters.quadcopter import Quadcopter
 from typing import Dict, List
 
 

@@ -3,7 +3,8 @@ import os, sys
 import numpy as np
 from enum import Enum
 from typing import Optional, Union, NamedTuple
-from threatengage.entities.quadcoters.quadcopter import Quadcopter, EntityType
+
+from core.entities.quadcopters.quadcopter import Quadcopter, EntityType
 from .pyflyt_level2_simulation import (
     L2AviarySimulation as AviaryL2,
 )

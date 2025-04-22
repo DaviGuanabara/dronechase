@@ -8,8 +8,7 @@ import pybullet_data
 from pybullet_utils import bullet_client
 
 
-from threatengage.entities.quadcoters.quadcopter import Quadcopter
-
+from core.entities.quadcopters.quadcopter import Quadcopter
 
 class L2AviarySimulation(bullet_client.BulletClient):
     """Aviary class, the core of how PyFlyt handles UAVs in the PyBullet simulation environment.

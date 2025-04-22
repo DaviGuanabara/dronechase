@@ -6,15 +6,15 @@ from collections import defaultdict
 from typing import Dict
 from gymnasium import spaces, Env
 
-from .components.pyflyt_level3_simulation import L3AviarySimulation
-from ...entities.quadcoters.quadcopter import Quadcopter
-from .components.quadcopter_manager import QuadcopterManager
-from .components.normalization import normalize_inertial_data
-from .components.task_progression import TaskProgression
-from .components.stages import L3Stage1 as Stage1
-from ...notification_system.message_hub import MessageHub
+from threatengage.environments.level3.components.pyflyt_level3_simulation import L3AviarySimulation
+from threatengage.environments.level3.components.quadcopter_manager import QuadcopterManager
+from threatengage.environments.level3.components.normalization import normalize_inertial_data
+from threatengage.environments.level3.components.task_progression import TaskProgression
+from threatengage.environments.level3.components.stages import L3Stage1 as Stage1
 
-from ...notification_system.topics_enum import Topics_Enum
+from core.notification_system.message_hub import MessageHub
+from core.entities.quadcopters.quadcopter import Quadcopter
+from core.notification_system.topics_enum import Topics_Enum
 
 
 class PyflytL3EnviromentV2(Env):

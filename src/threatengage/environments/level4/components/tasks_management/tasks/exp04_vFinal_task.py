@@ -4,21 +4,20 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 import math
 
-from ..task_progression import TaskStatus, Task
+from threatengage.environments.level4.components.utils.normalization import normalize_inertial_data
+from threatengage.environments.level4.components.tasks_management.task_progression import TaskStatus, Task
+from threatengage.environments.level4.components.entities_management.entities_manager import EntitiesManager, Quadcopter
+from threatengage.environments.level4.components.entities_management.offsets_handler import OffsetHandler
 
-from ...entities_management.entities_manager import EntitiesManager, Quadcopter
-from ...entities_management.offsets_handler import OffsetHandler
-
-from ......notification_system.message_hub import MessageHub
-from ......notification_system.topics_enum import Topics_Enum
-from ......entities.immovable_structures.immovable_structures import ImmovableStructures
-
-from typing import Optional, Union, NamedTuple, Dict, List, cast
-from ......entities.navigators.loitering_munition_navigator_air_combat_only import (
+from core.notification_system.message_hub import MessageHub
+from core.notification_system.topics_enum import Topics_Enum
+from core.entities.immovable_structures.immovable_structures import ImmovableStructures
+from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
+from core.entities.navigators.loitering_munition_navigator_air_combat_only import (
     KamikazeNavigator as KamikazeNavigator_KamikazeNavigator_Air_Combat_Only,
 )
-from ......entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 
+from typing import Optional, Union, NamedTuple, Dict, List, cast
 from typing import Tuple
 
 """
@@ -601,7 +600,7 @@ class Exp04_vFinal_Task(Task):
         )
 
         # Convert to Cartesian coordinates using broadcasting
-        xs = r * np.sin(phis) * np.cos(thetas)
+        xs = r * np.sin(phis) * np.cos(thetas) # type: ignore
         ys = r * np.sin(phis) * np.sin(thetas)
         zs = r * np.cos(phis)
 

@@ -1,28 +1,34 @@
 import numpy as np
 
-from ...notification_system.topics_enum import Topics_Enum
+
+
+# from .components.tasks_management.stages import L3Stage1 as Stage1
+from core.notification_system.message_hub import MessageHub
+from core.notification_system.topics_enum import Topics_Enum
+from core.entities.entity_type import EntityType
+
 from typing import Dict
 from gymnasium import spaces, Env
 from pynput.keyboard import Key, KeyCode
 from collections import defaultdict
 
-from .components.simulation.level4_simulation import L4AviarySimulation
-from .components.entities_management.entities_manager import (
+
+from threatengage.environments.level4.components.simulation.level4_simulation import L4AviarySimulation
+from threatengage.environments.level4.components.entities_management.entities_manager import (
     EntitiesManager,
     Quadcopter,
 )
 
-from .components.tasks_management.task_progression import TaskProgression
-from .components.tasks_management.tasks_dispatcher import TasksDispatcher
+from threatengage.environments.level4.components.tasks_management.task_progression import TaskProgression
+from threatengage.environments.level4.components.tasks_management.tasks_dispatcher import TasksDispatcher
 
-from .components.utils.normalization import normalize_inertial_data
+from threatengage.environments.level4.components.utils.normalization import normalize_inertial_data
 
 
-# from .components.tasks_management.stages import L3Stage1 as Stage1
-from ...notification_system.message_hub import MessageHub
+
 
 from stable_baselines3 import PPO
-from ...entities.entity_type import EntityType
+
 
 
 class EvaluationEnvironment(Env):
@@ -198,7 +204,7 @@ class EvaluationEnvironment(Env):
         position = entity.inertial_data.get("position")
         last_position = self.last_positions.get(entity.id, position)
 
-        variation = float(np.linalg.norm(position - last_position))
+        variation = float(np.linalg.norm(position - last_position)) # type: ignore - none possibility
         if variation < 1:
             self.last_last_positions[entity.id] = self.last_positions.get(
                 entity.id, position

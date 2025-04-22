@@ -21,7 +21,7 @@ viz = [
     "tensorboard (>=2.19.0,<3.0.0)"
 ]
 platform_input = [
-    "pynput (>=1.8.1,<2.0.0); sys_platform != 'darwin'"
+    "pynput (>=1.8.1,<2.0.0); sys_platform != 'darwin'",
 ]
 
 [build-system]
@@ -30,6 +30,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [
+  { include = "core", from = "src" },
   { include = "threatengage", from = "src" },
   { include = "threatsense", from = "src" }
 ]

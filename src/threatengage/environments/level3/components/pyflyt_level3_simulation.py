@@ -7,7 +7,7 @@ import pybullet as p
 import pybullet_data
 from pybullet_utils import bullet_client
 
-from threatengage.entities.quadcoters.quadcopter import Quadcopter
+from core.entities.quadcopters.quadcopter import Quadcopter
 
 
 class L3AviarySimulation(bullet_client.BulletClient):

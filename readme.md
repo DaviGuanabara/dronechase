@@ -45,7 +45,8 @@ pip install --all-extras
 ```
 
 > 📦 Optional extras:  
-> `pip install --extras "viz"` (includes Seaborn and TensorBoard)
+
+> `pip install --extras "viz platform_input"` (includes Seaborn and TensorBoard)
 
 ---
 

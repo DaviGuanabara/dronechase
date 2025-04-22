@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 import numpy as np
-from .quadcopter_manager import QuadcopterManager, Quadcopter
-from .task_progression import StageStatus, Stage
+
+from threatengage.environments.level3.components.quadcopter_manager import QuadcopterManager, Quadcopter
+from threatengage.environments.level3.components.task_progression import StageStatus, Stage
 from abc import ABC
 
-from .offsets_handler import OffsetHandler
-from ....notification_system.message_hub import MessageHub
-from ....notification_system.topics_enum import Topics_Enum
+from threatengage.environments.level3.components.offsets_handler import OffsetHandler
+from core.notification_system.message_hub import MessageHub
+from core.notification_system.topics_enum import Topics_Enum
 from typing import Dict, Optional
 import random
 

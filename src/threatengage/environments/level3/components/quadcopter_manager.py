@@ -4,7 +4,8 @@ import numpy as np
 from enum import Enum
 from typing import Optional, Union, NamedTuple, Dict, List, cast
 
-from threatengage.entities.quadcoters.quadcopter import Quadcopter, EntityType
+
+from core.entities.quadcopters.quadcopter import Quadcopter, EntityType
 from .pyflyt_level3_simulation import (
     L3AviarySimulation as AviaryL3,
 )

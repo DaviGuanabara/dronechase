@@ -1,6 +1,6 @@
 import numpy as np
 
-from ...notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import Topics_Enum
 from typing import Dict
 from gymnasium import spaces, Env
 from pynput.keyboard import Key, KeyCode
@@ -19,7 +19,7 @@ from .components.utils.normalization import normalize_inertial_data
 
 
 # from .components.tasks_management.stages import L3Stage1 as Stage1
-from ...notification_system.message_hub import MessageHub
+from core.notification_system.message_hub import MessageHub
 
 
 class Exp03vFinalEnvironment(Env):

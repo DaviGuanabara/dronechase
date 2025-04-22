@@ -6,10 +6,10 @@ from collections import defaultdict
 from typing import Dict
 from gymnasium import spaces, Env
 
-from .components.pyflyt_level2_simulation import L2AviarySimulation
-from ...entities.quadcoters.quadcopter import Quadcopter
-from .components.quadcopter_manager import QuadcopterManager
-from .components.normalization import normalize_inertial_data
+from core.entities.quadcopters.quadcopter import Quadcopter
+from threatengage.environments.level2.components.pyflyt_level2_simulation import L2AviarySimulation
+from threatengage.environments.level2.components.quadcopter_manager import QuadcopterManager
+from threatengage.environments.level2.components.normalization import normalize_inertial_data
 
 
 class PyflytL2Enviroment(Env):

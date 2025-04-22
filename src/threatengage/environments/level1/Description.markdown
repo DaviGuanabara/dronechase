@@ -1,5 +1,9 @@
 # Terminology Glossary
 
+
+LEGACY. 
+In reform.
+
 `CTEDS pybullet project`: A simulation project focusing on the concept of 'loyalwingmen' quadcopters defending a building against threats posed by loitering munitions.
 
 `Loyalwingmen`: Quadcopters designed to defend a specified target, such as a building or structure.

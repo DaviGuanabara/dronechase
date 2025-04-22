@@ -1,33 +1,36 @@
 # from .tasks import Task, L4Task1
-from .tasks.exp01_task import Task, Exp01_Task
-from .tasks.exp02_task import Exp02_Task
-from .tasks.exp02_v2_task import Exp02_V2_Task
-from .tasks.exp02_v3_task import Exp02_V3_Task
-from .tasks.exp02_v2_full_task import Exp02_V2_Full_Task
 
-from .tasks.exp02_v4_single_air_combat_only_task import (
+
+
+from threatengage.environments.level4.components.tasks_management.tasks.legacy.exp01_task import Task, Exp01_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp02_task import Exp02_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp02_v2_task import Exp02_V2_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp02_v3_task import Exp02_V3_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp02_v2_full_task import Exp02_V2_Full_Task
+
+from threatengage.environments.level4.components.tasks_management.tasks.exp02_v4_single_air_combat_only_task import (
     Exp02_V4_Single_air_combat_only_Task,
 )
 
-from .tasks.exp021_task import Exp021_Task
-from .tasks.exp03_cooperative_only_task import Exp03_Cooperative_Only_Task
-from .tasks.exp04_cooperative_only_coop_bt_stopped_task import (
+from threatengage.environments.level4.components.tasks_management.tasks.legacy.exp021_task import Exp021_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp03_cooperative_only_task import Exp03_Cooperative_Only_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp04_cooperative_only_coop_bt_stopped_task import (
     Exp04_Cooperative_Only_BT_Stopped_Task,
 )
 
-from .tasks.exp05_cooperative_only_2_RL_task import Exp05_Cooperative_Only_2_RL_Task
-from .tasks.exp05_cooperative_only_2_RL_V2_task import (
+from threatengage.environments.level4.components.tasks_management.tasks.exp05_cooperative_only_2_RL_task import Exp05_Cooperative_Only_2_RL_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp05_cooperative_only_2_RL_V2_task import (
     Exp05_Cooperative_Only_2_RL_V2_Task,
 )
 
-from .tasks.exp03_v2_cooperative_only_task import Exp03_V2_Cooperative_Only_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp03_v2_cooperative_only_task import Exp03_V2_Cooperative_Only_Task
 
-from .tasks.exp02_vFinal_task import Exp02_vFinal_Task
-from .tasks.exp03_vFinal_task import Exp03_vFinal_Task
-from .tasks.exp04_vFinal_task import Exp04_vFinal_Task
-from .tasks.exp05_vFinal_task import Exp05_vFinal_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp02_vFinal_task import Exp02_vFinal_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp03_vFinal_task import Exp03_vFinal_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp04_vFinal_task import Exp04_vFinal_Task
+from threatengage.environments.level4.components.tasks_management.tasks.exp05_vFinal_task import Exp05_vFinal_Task
 
-from .tasks.evaluation_task import Evaluation_Task
+from threatengage.environments.level4.components.tasks_management.tasks.evaluation_task import Evaluation_Task
 
 
 class TasksDispatcher:
