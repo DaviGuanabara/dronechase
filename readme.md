@@ -48,6 +48,9 @@ pip install --all-extras
 
 > `pip install --extras "viz platform_input"` (includes Seaborn and TensorBoard)
 
+
+Pay attention:
+Poetry (version 1.4.0) do not work with this pyproject.toml (that uses PEP 621)
 ---
 
 ## 📦 How to Use
