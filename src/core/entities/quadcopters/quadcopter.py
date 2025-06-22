@@ -1,12 +1,13 @@
 import numpy as np
-import pybullet as p # type: ignore
+import pybullet as p  # type: ignore
 
 from typing import Dict, Optional
 from enum import Enum, auto
 
-from PyFlyt.core.drones.quadx import QuadX # type: ignore
-from pybullet_utils.bullet_client import BulletClient # type: ignore
+from PyFlyt.core.drones.quadx import QuadX  # type: ignore
+from pybullet_utils.bullet_client import BulletClient  # type: ignore
 
+from components.sensors.fused_lidar import FusedLiDAR
 # =================================================================================================================
 # Components
 # =================================================================================================================
@@ -18,6 +19,8 @@ from core.notification_system import Topics_Enum, MessageHub
 
 # TODO: remove subscrition of current step of the components, i should centralize this here (at quadcopter class).
 # TODO: make function called hit, it will be used instead of disarm.
+
+
 class Quadcopter:
     INVALID_ID = -1
 
@@ -33,7 +36,7 @@ class Quadcopter:
         lidar_resolution: int = 16,
         shoot_range: float = 0.8,
         formation_position: np.ndarray = np.array([0, 0, 0]),
-        lidar_class = LiDAR
+        lidar_class=LiDAR
     ):
         self.quadx = quadx
         self.formation_position = formation_position
@@ -61,6 +64,8 @@ class Quadcopter:
 
         self.init_physical_properties()
         self.update_color()
+
+        self._is_agent = False
 
     def init_physical_properties(self):
         # print("getting dynamics info")
@@ -93,7 +98,8 @@ class Quadcopter:
 
         elif self.quadcopter_type == EntityType.LOITERINGMUNITION:
             if self.armed:
-                p.changeVisualShape(self.id, -1, rgbaColor=Red)  # Red for armed invader
+                # Red for armed invader
+                p.changeVisualShape(self.id, -1, rgbaColor=Red)
             else:
                 p.changeVisualShape(
                     self.id, -1, rgbaColor=LightRed
@@ -113,6 +119,7 @@ class Quadcopter:
         debug_on: bool = False,
         lidar_on: bool = False,
         lidar_radius: float = 5,
+        use_fused_lidar: bool = False,
     ):
         quadx = QuadX(
             simulation,
@@ -126,6 +133,9 @@ class Quadcopter:
         quadx.set_mode(6)
 
         # print(f"Lidar Radius: {lidar_radius}")
+
+        lidar_class = FusedLiDAR if use_fused_lidar else LiDAR
+
         return Quadcopter(
             simulation=simulation,
             quadx=quadx,
@@ -135,6 +145,7 @@ class Quadcopter:
             lidar_on=lidar_on,
             lidar_radius=lidar_radius,
             formation_position=position,
+            lidar_class=lidar_class
         )
 
     @staticmethod
@@ -159,6 +170,9 @@ class Quadcopter:
         quadx.reset()
         quadx.set_mode(6)
 
+        # logic exclusive for loyalwingmen
+        # lidar_class = FusedLidar if use_fused_lidar else LiDAR
+
         return Quadcopter(
             simulation=simulation,
             quadx=quadx,
@@ -167,6 +181,7 @@ class Quadcopter:
             debug_on=debug_on,
             lidar_on=lidar_on,
             formation_position=position,
+            lidar_class=LiDAR
         )
 
     # =================================================================================================================
@@ -203,7 +218,6 @@ class Quadcopter:
 
     def _publish_inertial_data(self):
         # TODO: broadcast with current step
-
         """
         Publish the current flight state data to the message hub.
         """
@@ -341,7 +355,8 @@ class Quadcopter:
 
     def replace(self, position: np.ndarray, attitude: np.ndarray):
         quaternion = self.simulation.getQuaternionFromEuler(attitude)
-        self.simulation.resetBasePositionAndOrientation(self.id, position, quaternion)
+        self.simulation.resetBasePositionAndOrientation(
+            self.id, position, quaternion)
         self.formation_position = position
         if self._armed:
             self.update_imu()
@@ -404,7 +419,8 @@ class Quadcopter:
             p.setCollisionFilterGroupMask(self.id, joint_indice, group, mask)
 
     def show_name(self):
-        quad_position = self.flight_state_manager.get_data("position").get("position")
+        quad_position = self.flight_state_manager.get_data(
+            "position").get("position")
 
         if quad_position is None:
             return
@@ -505,3 +521,19 @@ class Quadcopter:
         max_speed_kmh = 10
         KMH_TO_MS = 1000 / 3600
         return speed_modulator * max_speed_kmh * KMH_TO_MS
+
+    def set_as_agent(self):
+        """
+        Marks this quadcopter as the agent.
+        It updates internal components accordingly (e.g., LiDAR fusion).
+        """
+
+        if isinstance(self.lidar, FusedLiDAR):
+            self.lidar.enable_fusion()
+
+        self._is_agent = True
+        self.quadcopter_name = f"Agent_{self.id}"
+
+    @property
+    def is_agent(self) -> bool:
+        return getattr(self, "_is_agent", False)

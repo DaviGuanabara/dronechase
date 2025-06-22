@@ -1,3 +1,11 @@
+from threatsense.level5.components.normalization import normalize_inertial_data
+from threatsense.level5.components.tasks_management.tasks_dispatcher import TasksDispatcher
+from threatsense.level5.components.tasks_management.task_progression import TaskProgression
+from threatsense.level5.components.level5_simulation import L5AviarySimulation
+from threatsense.level5.components.entities_manager import EntitiesManager
+from core.entities.quadcopters.quadcopter import Quadcopter
+from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.message_hub import MessageHub
 from collections import defaultdict
 from typing import Dict
 
@@ -11,22 +19,14 @@ except ImportError:
     PYNPUT_AVAILABLE = False
 
 
-
 # from .components.tasks_management.stages import L3Stage1 as Stage1
 
 print("importing core on Level 5 Environment")
-from core.notification_system.message_hub import MessageHub
-from core.notification_system.topics_enum import Topics_Enum
-from core.entities.quadcopters.quadcopter import Quadcopter
 
 print("importing level 5 components")
-from threatsense.level5.components.entities_manager import EntitiesManager
-from threatsense.level5.components.level5_simulation import L5AviarySimulation
-from threatsense.level5.components.tasks_management.task_progression import TaskProgression
-from threatsense.level5.components.tasks_management.tasks_dispatcher import TasksDispatcher
-from threatsense.level5.components.normalization import normalize_inertial_data
 
 print("importing level 5 components - done")
+
 
 class Level5Environment(Env):
     """
@@ -42,12 +42,11 @@ class Level5Environment(Env):
     Finally, I tried to do my best inside of my time constraint. Then, sorry for messy code.
     """
 
-    RL_AGENT_PERSUER_ID = 0  # The RL Agent is the first pursuer in the entities manager.
-
     def __init__(
         self,
         dome_radius: float = 20,
         rl_frequency: int = 15,
+        use_fused_lidar: bool = False,
         GUI: bool = False,
     ):
         """Initialize the environment."""
@@ -55,7 +54,7 @@ class Level5Environment(Env):
         print("ThreatSense level 5 environment init")
 
         print("Level 5 Environment - init constants")
-        self.init_constants(dome_radius, rl_frequency, GUI)
+        self.init_constants(dome_radius, rl_frequency, use_fused_lidar, GUI)
         self.init_components(dome_radius, GUI)
         self.frequency_adjustments(rl_frequency)
 
@@ -68,8 +67,6 @@ class Level5Environment(Env):
         self.task_progression.on_episode_start()
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
-
-        
 
     def setup_static_entities(self):
         entities_manager = self.entities_manager
@@ -88,11 +85,12 @@ class Level5Environment(Env):
 
     #### Initialization ######################################
 
-    def init_constants(self, dome_radius: float, rl_frequency: int, GUI: bool):
+    def init_constants(self, dome_radius: float, rl_frequency: int, use_fused_lidar: bool, GUI: bool):
         self.dome_radius = dome_radius
         self.debug_on = GUI
         self.show_name_on = GUI
         self.max_step_calls = 20 * rl_frequency
+        self.use_fused_lidar = use_fused_lidar
 
     def init_globals(self):
         self.last_action = np.zeros(4)
@@ -110,7 +108,8 @@ class Level5Environment(Env):
 
         print("task progression init - Level 5 Environment")
         self.task_progression = TaskProgression(
-            TasksDispatcher.level5_tasks(self.dome_radius, self.entities_manager)
+            TasksDispatcher.level5_tasks(
+                self.dome_radius, self.entities_manager, use_fused_lidar=self.use_fused_lidar)
         )
 
         self.setup_messange_hub()
@@ -170,8 +169,8 @@ class Level5Environment(Env):
 
         # MAKE A CONSTANT
 
-        rl_agent_persuer = self.entities_manager.get_all_pursuers()[self.RL_AGENT_PERSUER_ID]
-        rl_agent_persuer.drive(rl_action, self.show_name_on)
+        rl_agent = self.entities_manager.get_agent()
+        rl_agent.drive(rl_action, self.show_name_on)
 
         self.task_progression.on_step_start()
 
@@ -219,23 +218,22 @@ class Level5Environment(Env):
         The RL AGENT PERSUER is the source of the observation.
         """
 
-        rl_agent_pursuer: Quadcopter = self.entities_manager.get_all_pursuers()[
-            self.RL_AGENT_PERSUER_ID]
-        rl_agent_pursuer.update_lidar()
+        rl_agent: Quadcopter = self.entities_manager.get_agent()
 
-        inertial_data: np.ndarray = self.process_inertial_state(
-            rl_agent_pursuer)
-        rl_agent_pursuer.lidar_data
+        rl_agent.update_lidar()
 
-        lidar: np.ndarray = rl_agent_pursuer.lidar_data.get(
+        inertial_data: np.ndarray = self.process_inertial_state(rl_agent)
+        rl_agent.lidar_data
+
+        lidar: np.ndarray = rl_agent.lidar_data.get(
             "lidar",
             np.zeros(
-                rl_agent_pursuer.lidar_shape,
+                rl_agent.lidar_shape,
                 dtype=np.float32,
             ),
         )
 
-        gun_state = rl_agent_pursuer.gun_state
+        gun_state = rl_agent.gun_state
 
         inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0).astype(
             np.float32
@@ -243,7 +241,8 @@ class Level5Environment(Env):
 
         return {
             "lidar": lidar.astype(np.float32),
-            "inertial_data": inertial_gun_concat,  # inertial_data.astype(np.float32),
+            # inertial_data.astype(np.float32),
+            "inertial_data": inertial_gun_concat,
             "last_action": self.last_action.astype(np.float32),
             # "gun": gun_state.astype(np.float32),
         }
@@ -302,8 +301,8 @@ class Level5Environment(Env):
         """
         Shape from RL AGENT PERSUER.
         """
-        rl_agent_persuer = self.entities_manager.get_all_pursuers()[self.RL_AGENT_PERSUER_ID]
 
+        rl_agent = self.entities_manager.get_agent()
         position = 3
         velocity = 3
         attitude = 3
@@ -312,10 +311,10 @@ class Level5Environment(Env):
 
         inertial_data = position + velocity + attitude + angular_rate + gun_state
 
-        lidar_shape = rl_agent_persuer.lidar_shape
+        lidar_shape = rl_agent.lidar_shape
         last_action_shape = 4
 
-        gun_state_shape = rl_agent_persuer.gun_state_shape
+        gun_state_shape = rl_agent.gun_state_shape
 
         return {
             "lidar": lidar_shape,
@@ -340,14 +339,14 @@ class Level5Environment(Env):
         array = np.array([])
         for key in dictionary:
             value: np.ndarray = (
-                dictionary[key] if dictionary[key] is not None else np.array([])
+                dictionary[key] if dictionary[key] is not None else np.array([
+                ])
             )
             array = np.concatenate((array, value))
 
         return array
 
     ################################################################################
-
 
     def get_keymap(self):
         key_map = defaultdict(lambda: [0, 0, 0, 1])  # default action

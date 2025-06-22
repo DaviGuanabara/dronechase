@@ -5,9 +5,6 @@ from dataclasses import dataclass
 import math
 
 
-
-
-
 from threatsense.level5.components.normalization import normalize_inertial_data
 from threatsense.level5.components.tasks_management.task_progression import TaskStatus, Task
 from threatsense.level5.components.entities_manager import EntitiesManager, Quadcopter
@@ -17,7 +14,7 @@ from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import Topics_Enum
 from core.entities.immovable_structures.immovable_structures import ImmovableStructures
 
-#Problema aqui. LoyalwingmanBehaviorTree vem do core, que aponta pro level4.
+# Problema aqui. LoyalwingmanBehaviorTree vem do core, que aponta pro level4.
 from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 from core.entities.navigators.loitering_munition_navigator_air_combat_only import (
     KamikazeNavigator as KamikazeNavigator_KamikazeNavigator_Air_Combat_Only,
@@ -40,11 +37,13 @@ class Level5_Task(Task):
         dome_radius: float,
         # debug_on: bool = False,
         building_position: np.ndarray = np.array([0, 0, 0.1]),
+        use_fused_lidar=False
     ):
         print("Level 5 - Task Init")
 
         self.dome_radius = dome_radius
         self.entities_manager = entities_manager
+        self.use_fused_lidar = use_fused_lidar
 
         print("init constants and globals")
         self.init_constants()
@@ -64,8 +63,9 @@ class Level5_Task(Task):
         self.kamikaze_navigator = KamikazeNavigator_KamikazeNavigator_Air_Combat_Only(
             building_position
         )
-        self.loyalwingman_navigator = LoyalWingmanBehaviorTree(building_position)
-        
+        self.loyalwingman_navigator = LoyalWingmanBehaviorTree(
+            building_position)
+
         print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
 
     def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
@@ -92,9 +92,6 @@ class Level5_Task(Task):
         self.MAX_NUMBER_OF_ROUNDS = self.calculate_max_rounds(
             self.NUM_PURSUERS, self.MUNITION_PER_DEFENDER, self.NUM_INVADERS)
         # Número de inimigos pode ser arbitrário (ex: para gerar oclusão, complexidade)
-        
-
-        
 
         print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
         print(f"[INIT] NUM_INVADERS: {self.NUM_INVADERS}")
@@ -166,14 +163,14 @@ class Level5_Task(Task):
         invaders = self.entities_manager.get_all_invaders()
         # print(current_round, len(invaders))
 
-        positions = self.generate_positions(current_round, self.ENEMY_BORN_RADIUS)
+        positions = self.generate_positions(
+            current_round, self.ENEMY_BORN_RADIUS)
         for i in range(current_round):
             # TODO: Find a better way to do this
             # positions = self.generate_positions(1, 6)
 
             self.entities_manager.replace_quadcopter(invaders[i], positions[i])
             self.entities_manager.arm_by_quadcopter(invaders[i])
-
 
     def calculate_max_rounds(self, num_pursuers: int, munition_per_defender: int, initial_invaders: int) -> int:
         """
@@ -222,7 +219,8 @@ class Level5_Task(Task):
         int
             The maximum number of possible rounds (rounded down).
         """
-        total_abates = num_pursuers * munition_per_defender + 1 # # +1 to account for the suicidal behavior of the agent
+        total_abates = num_pursuers * munition_per_defender + \
+            1  # +1 to account for the suicidal behavior of the agent
         a = initial_invaders
 
         b = 2 * a - 1
@@ -230,7 +228,6 @@ class Level5_Task(Task):
 
         sol = (-b + math.sqrt(delta)) / 2
         return math.ceil(sol)
-
 
     # ===============================================================================
     # On Notification
@@ -243,11 +240,10 @@ class Level5_Task(Task):
             self.kamikaze_navigator.update(invader, self.offset_handler)
 
     def drive_loyalwingmen(self):
-        pursuers: List[Quadcopter] = self.entities_manager.get_armed_pursuers()
+        allies = self.entities_manager.get_allies(armed=True)
 
-        # pursuer[0] is the RL agent
-        for pursuer in pursuers[1:]:
-            self.loyalwingman_navigator.update(pursuer, self.offset_handler)
+        for ally in allies:
+            self.loyalwingman_navigator.update(ally, self.offset_handler)
 
     # ===============================================================================
     # On Calls
@@ -326,7 +322,8 @@ class Level5_Task(Task):
             agent_suicided,
         )
 
-        self.increment_max_step(successful_rl_agent_shots + successful_allies_shots)
+        self.increment_max_step(
+            successful_rl_agent_shots + successful_allies_shots)
         termination = self.compute_termination()
         return reward, termination
 
@@ -377,11 +374,12 @@ class Level5_Task(Task):
         pursuer_suicided = 0
         agent_suicided = 0
 
-        agent_id = self.entities_manager.get_all_pursuers()[0].id
+        agent_id = self.entities_manager.agent_id
 
         to_disarm: list = []
         for pursuer_id in list(identified_invaders_nearby.keys()):
-            to_disarm.extend((pursuer_id, identified_invaders_nearby[pursuer_id][0]))
+            to_disarm.extend(
+                (pursuer_id, identified_invaders_nearby[pursuer_id][0]))
             self.entities_manager.disarm_by_ids(to_disarm)
             pursuer_munition = self.entities_manager.get_quadcopters(id=pursuer_id)[
                 0
@@ -404,7 +402,7 @@ class Level5_Task(Task):
             self.PURSUER_SHOOT_RANGE
         )
 
-        agent = self.entities_manager.get_all_pursuers()[0]
+        agent = self.entities_manager.get_agent()
 
         successful_rl_agent_shots = 0
         successful_allies_shots = 0
@@ -439,7 +437,7 @@ class Level5_Task(Task):
     ):  # sourcery skip: low-code-quality
         # Initialize reward components
         score, bonus, penalty = 0, 0, 0
-        agent = self.entities_manager.get_all_pursuers()[0]
+        agent = self.entities_manager.get_agent()
 
         munition = agent.gun_state[0]
         reload_progress = agent.gun_state[1]
@@ -458,7 +456,8 @@ class Level5_Task(Task):
             target_id = self.offset_handler.identify_closest_invader(agent.id)
 
         else:
-            target_id = self.offset_handler.identify_closest_invader(closest_ally_id)
+            target_id = self.offset_handler.identify_closest_invader(
+                closest_ally_id)
 
         target_position = np.array([0, 0, 0])
         if target_id > -1:
@@ -495,7 +494,8 @@ class Level5_Task(Task):
         # Now, i am going to try 0.5
         if successful_allies_shots > 0 or pursuer_suicided > 0:
             bonus += (
-                0.5 * (successful_allies_shots + pursuer_suicided) * self.MAX_REWARD
+                0.5 * (successful_allies_shots +
+                       pursuer_suicided) * self.MAX_REWARD
             )
 
         elif pursuers_exploded > 0:
@@ -564,7 +564,7 @@ class Level5_Task(Task):
             return True
 
         # This is an training environment, which means that it has to stop when the agent dies.
-        agent = self.entities_manager.get_all_pursuers()[0]
+        agent = self.entities_manager.get_agent()
 
         if not agent.armed:
             self._stage_status = TaskStatus.FAILURE
@@ -607,7 +607,7 @@ class Level5_Task(Task):
         )
 
         # Convert to Cartesian coordinates using broadcasting
-        xs = r * np.sin(phis) * np.cos(thetas) # type: ignore
+        xs = r * np.sin(phis) * np.cos(thetas)  # type: ignore
         ys = r * np.sin(phis) * np.sin(thetas)
         zs = r * np.cos(phis)
 
@@ -616,7 +616,8 @@ class Level5_Task(Task):
     def replace_invaders(self):
         # self.entities_manager.disarm_all()
         invaders = self.entities_manager.get_all_invaders()
-        positions = self.generate_positions(len(invaders), self.ENEMY_BORN_RADIUS)
+        positions = self.generate_positions(
+            len(invaders), self.ENEMY_BORN_RADIUS)
         # (self.invaders_positions)  # self.generate_positions(len(invaders), self.dome_radius / 2)
         self.entities_manager.replace_quadcopters(invaders, positions)
 
@@ -628,7 +629,8 @@ class Level5_Task(Task):
 
     def spawn_invader_squad(self):
         # num_invaders = 2
-        positions = self.generate_positions(self.NUM_INVADERS, self.ENEMY_BORN_RADIUS)
+        positions = self.generate_positions(
+            self.NUM_INVADERS, self.ENEMY_BORN_RADIUS)
         # np.array([[0, 0, 10]])  #   # /2
         invaders: List[Quadcopter] = self.entities_manager.spawn_invader(
             positions, "invader"
@@ -640,22 +642,38 @@ class Level5_Task(Task):
         # self.invaders_positions = positions
 
     def spawn_pursuer_squad(self):
-        # num_pursuers = 1
         positions = self.generate_positions(self.NUM_PURSUERS, 2)
-        # np.array([[0, 5, 2]])  # self.generate_positions(self.NUM_PURSUERS, 2)
 
-        pursuers = self.entities_manager.spawn_pursuer(
-            positions, "Agent", lidar_radius=2 * self.dome_radius
+        # Separa posição e nome do agente
+        agent_pos = positions[:1]
+        agent_name = ["Agent"]
+
+        # Separa posições e nomes dos aliados
+        allies_pos = positions[1:]
+        ally_names = [f"Ally{i}" for i in range(1, self.NUM_PURSUERS)]
+
+        # Spawna agente com FusedLiDAR
+        agent = self.entities_manager.spawn_pursuer(
+            positions=agent_pos, names=agent_name, lidar_radius=2 * self.dome_radius, use_fused_lidar=self.use_fused_lidar,
         )
 
-        i = 0
+        # Spawna aliados com LiDAR padrão
+        allies = self.entities_manager.spawn_pursuer(
+            allies_pos, ally_names, lidar_radius=2 * self.dome_radius
+        )
+
+        # Junta todos
+        pursuers = agent + allies
+
         for pursuer in pursuers:
-            print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
+            print(
+                f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
             pursuer.set_munition(self.MUNITION_PER_DEFENDER)
-            i =+ 1
 
-        print(f"[DEBUG] Spawning pursuer {i+1} of {self.NUM_PURSUERS}")
+        print(
+            f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
 
+        self.entities_manager.set_agent()
 
     def get_invaders_positions(self):
         invaders = self.entities_manager.get_all_invaders()

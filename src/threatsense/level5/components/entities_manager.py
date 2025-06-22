@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 
 import numpy as np
 from enum import Enum
@@ -11,7 +12,7 @@ from core.entities.entity_type import EntityType
 import threading
 from core.entities.immovable_structures.immovable_structures import ImmovableStructures
 from core.entities.navigators.loitering_munition_navigator import KamikazeNavigator
-import inspect
+
 
 class EntitiesManager:
     # ===========================================================================
@@ -21,11 +22,13 @@ class EntitiesManager:
     # ensuring the multiple environment creation in training.
     # ===========================================================================
 
+    DEFAULT_LIDAR_RADIUS = 5
     _thread_local_data = threading.local()
 
     def __new__(cls):
         if not hasattr(cls._thread_local_data, "_instance"):
-            cls._thread_local_data._instance = super(EntitiesManager, cls).__new__(cls)
+            cls._thread_local_data._instance = super(
+                EntitiesManager, cls).__new__(cls)
             cls._thread_local_data._instance._initialize()
         return cls._thread_local_data._instance
 
@@ -34,6 +37,8 @@ class EntitiesManager:
         self.drone_registry: Dict[int, Quadcopter] = {}
         self.kamikaze_navigator = KamikazeNavigator(np.array([0, 0, 1]))
         self.debug = False
+
+        self.agent_id = -1
 
     # ===========================================================================
     # Lazy Initialization
@@ -61,14 +66,11 @@ class EntitiesManager:
         self,
         positions: np.ndarray,
         quadcopter_type: EntityType,
-        names: Union[
-            List[str], str
-        ] = "no_name",  # Accept either a list of strings or a single string
-        lidar_radius: float = 5,
+        names: Union[List[str], str] = "no_name",
+        lidar_radius: float = DEFAULT_LIDAR_RADIUS,
+        use_fused_lidar: bool = False,
     ) -> List[Quadcopter]:
         # Check if names is a list, if not, convert it to a list
-
-        stack = inspect.stack()
         if not isinstance(names, list):
             names = [names]
 
@@ -76,24 +78,30 @@ class EntitiesManager:
         if len(names) < len(positions):
             names.extend(["quadcopter"] * (len(positions) - len(names)))
 
-        instantiator = (
-            Quadcopter.spawn_loyalwingman
-            if quadcopter_type == EntityType.LOYALWINGMAN
-            else Quadcopter.spawn_loiteringmunition
-        )
-
         drones = []
         for i, position in enumerate(positions):
-            drone = instantiator(
-                self.simulation,
-                position,
-                (
-                    names[i] if i < len(names) else "quadcopter"
-                ),  # Use names list, default to "quadcopter" if out of bounds
-                debug_on=False,
-                lidar_on=True,
-                lidar_radius=lidar_radius,
-            )
+            name = names[i] if i < len(names) else "quadcopter"
+
+            if quadcopter_type == EntityType.LOYALWINGMAN:
+                drone = Quadcopter.spawn_loyalwingman(
+                    self.simulation,
+                    position,
+                    name,
+                    debug_on=False,
+                    lidar_on=True,
+                    lidar_radius=lidar_radius,
+                    use_fused_lidar=use_fused_lidar,
+                )
+            else:
+                drone = Quadcopter.spawn_loiteringmunition(
+                    self.simulation,
+                    position,
+                    name,
+                    debug_on=False,
+                    lidar_on=True,
+                    lidar_radius=lidar_radius,
+                )
+
             self.simulation.active_drones[drone.id] = drone
             drone.update_imu()
             self.drone_registry[drone.id] = drone
@@ -105,19 +113,20 @@ class EntitiesManager:
         self,
         positions: np.ndarray,
         names: Union[List[str], str] = "no_name",
-        lidar_radius: float = 5,
+        lidar_radius: float = DEFAULT_LIDAR_RADIUS,
+        use_fused_lidar=False
     ) -> List[Quadcopter]:
-        
+
         print("[DEBUG] EntitiesManager: spawning pursuer")
 
         return self.spawn_quadcopter(
-            positions, EntityType.LOYALWINGMAN, names, lidar_radius
+            positions, EntityType.LOYALWINGMAN, names, lidar_radius, use_fused_lidar=use_fused_lidar
         )
 
     def spawn_invader(
-        self, positions: np.ndarray, name: str = "no_name"
+        self, positions: np.ndarray, names: Union[List[str], str] = "no_name"
     ) -> List[Quadcopter]:
-        return self.spawn_quadcopter(positions, EntityType.LOITERINGMUNITION, name)
+        return self.spawn_quadcopter(positions, EntityType.LOITERINGMUNITION, names)
 
     # ===========================================================================
     # Creation of Static Structures
@@ -144,11 +153,11 @@ class EntitiesManager:
         armed: Optional[bool],
         id: Optional[int],
     ) -> bool:
-        return (
-            (quadcopter_type is None or drone.quadcopter_type == quadcopter_type)
-            and (armed is None or drone.armed == armed)
-            and (id is None or drone.id == id)
-        )
+        return all([
+            quadcopter_type is None or drone.quadcopter_type == quadcopter_type,
+            armed is None or drone.armed == armed,
+            id is None or drone.id == id,
+        ])
 
     def get_quadcopters(
         self,
@@ -241,15 +250,15 @@ class EntitiesManager:
     # ===========================================================================
 
     def shoot_by_ids(self, from_id: int, target_id: int):
-        from_quadcopter = self.drone_registry[from_id]
-        # print(f"Quadcopter can fire ? {from_quadcopter.gun.can_fire()} - Gun Step: {from_quadcopter.gun.current_step} - lidar step:{from_quadcopter.lidar.current_step}")
-        if shot_successful := from_quadcopter.shoot():
-            # print("shoot successful")
-            # print("Munition:", from_quadcopter.gun.munition)
-            self.disarm_by_ids([target_id])
-            return shot_successful
+        from_drone = self.drone_registry.get(from_id)
+        target_drone = self.drone_registry.get(target_id)
 
-        # print("shoot unsuccessful")
+        if from_drone is None or target_drone is None:
+            return False
+
+        if from_drone.shoot():
+            self.disarm_by_quadcopter(target_drone)
+            return True
         return False
 
     # ===========================================================================
@@ -336,3 +345,55 @@ class EntitiesManager:
             ],
         )
         self.replace_quadcopters(drones, positions)
+
+    def _select_loyalwingman_randomly(self, rng: Optional[np.random.RandomState] = None):
+        if rng is None:
+            rng = np.random.RandomState()
+        return (
+            rng.choice(candidate_ids)
+            if (
+                candidate_ids := [
+                    d_id
+                    for d_id, quad in self.drone_registry.items()
+                    if quad.quadcopter_type == EntityType.LOYALWINGMAN
+                ]
+            )
+            else -1
+        )
+
+    def set_agent(self, drone_id: int = -1, rng: Optional[np.random.RandomState] = None) -> bool:
+        """
+        Sets the RL agent among the registered drones.
+
+        If `drone_id` is -1, a random LOYALWINGMAN will be selected.
+
+        Returns True if an agent was successfully set, False otherwise.
+        """
+        if drone_id == -1:
+            drone_id = self._select_loyalwingman_randomly(rng)
+
+        if drone_id not in self.drone_registry:
+            return False
+
+        self.agent_id = drone_id
+
+        agent = self.drone_registry[drone_id]
+        agent.set_as_agent()
+        return True
+
+    def get_agent_id(self):
+        return self.agent_id
+
+    def get_agent(self):
+        return self.drone_registry[self.agent_id]
+
+    def get_allies(self, armed: bool = False) -> List[Quadcopter]:
+        agent_id = self.get_agent_id()
+        pursuers = self.get_all_pursuers()
+
+        allies = [drone for drone in pursuers if drone.id != agent_id]
+
+        if armed:
+            allies = [drone for drone in allies if drone.armed]
+
+        return allies
