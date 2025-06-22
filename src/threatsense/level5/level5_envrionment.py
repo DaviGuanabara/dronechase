@@ -3,20 +3,30 @@ from typing import Dict
 
 import numpy as np
 from gymnasium import Env, spaces
-from pynput.keyboard import Key, KeyCode
+try:
+    from pynput import keyboard as pynput_keyboard  # type: ignore
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    pynput_keyboard = None  # ✅ define mesmo se der erro
+    PYNPUT_AVAILABLE = False
+
+
 
 # from .components.tasks_management.stages import L3Stage1 as Stage1
 
-
+print("importing core on Level 5 Environment")
 from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import Topics_Enum
 from core.entities.quadcopters.quadcopter import Quadcopter
+
+print("importing level 5 components")
 from threatsense.level5.components.entities_manager import EntitiesManager
-from threatsense.level5.components.level5_simulation import L4AviarySimulation
+from threatsense.level5.components.level5_simulation import L5AviarySimulation
 from threatsense.level5.components.tasks_management.task_progression import TaskProgression
 from threatsense.level5.components.tasks_management.tasks_dispatcher import TasksDispatcher
 from threatsense.level5.components.normalization import normalize_inertial_data
 
+print("importing level 5 components - done")
 
 class Level5Environment(Env):
     """
@@ -32,6 +42,8 @@ class Level5Environment(Env):
     Finally, I tried to do my best inside of my time constraint. Then, sorry for messy code.
     """
 
+    RL_AGENT_PERSUER_ID = 0  # The RL Agent is the first pursuer in the entities manager.
+
     def __init__(
         self,
         dome_radius: float = 20,
@@ -39,8 +51,10 @@ class Level5Environment(Env):
         GUI: bool = False,
     ):
         """Initialize the environment."""
-        print("pyflyt level 4 environment init")
+        print("Init Level 5 Environment Init ThreatSense level 5 environment")
+        print("ThreatSense level 5 environment init")
 
+        print("Level 5 Environment - init constants")
         self.init_constants(dome_radius, rl_frequency, GUI)
         self.init_components(dome_radius, GUI)
         self.frequency_adjustments(rl_frequency)
@@ -54,6 +68,8 @@ class Level5Environment(Env):
         self.task_progression.on_episode_start()
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
+
+        
 
     def setup_static_entities(self):
         entities_manager = self.entities_manager
@@ -83,11 +99,16 @@ class Level5Environment(Env):
         self.step_counter = 0
 
     def init_components(self, dome_radius, GUI):
-        self.simulation = L4AviarySimulation(world_scale=dome_radius, render=GUI)
+
+        print("Level 5 Environment - init components")
+        print("initializing L5AviarySimulation")
+        self.simulation = L5AviarySimulation(
+            world_scale=dome_radius, render=GUI)
         self.entities_manager = EntitiesManager()
         self.entities_manager.setup_simulation(self.simulation)
         self.entities_manager.setup_debug(self.debug_on)
 
+        print("task progression init - Level 5 Environment")
         self.task_progression = TaskProgression(
             TasksDispatcher.level5_tasks(self.dome_radius, self.entities_manager)
         )
@@ -146,8 +167,11 @@ class Level5Environment(Env):
         # TODO: Basically, i have to create a function in entities_manager that returns the RL Agent.
         # And it needs to be separeted from other entities. Maybe, i just need to create a quadcopter_type called RL Agent.
         # Or add another variable. I don't know yet.
-        pursuer = self.entities_manager.get_all_pursuers()[0]
-        pursuer.drive(rl_action, self.show_name_on)
+
+        # MAKE A CONSTANT
+
+        rl_agent_persuer = self.entities_manager.get_all_pursuers()[self.RL_AGENT_PERSUER_ID]
+        rl_agent_persuer.drive(rl_action, self.show_name_on)
 
         self.task_progression.on_step_start()
 
@@ -191,23 +215,27 @@ class Level5Environment(Env):
         )
 
     def compute_observation(self) -> Dict:
-        """Return the observation of the simulation."""
+        """Return the observation of the simulation.
+        The RL AGENT PERSUER is the source of the observation.
+        """
 
-        pursuer: Quadcopter = self.entities_manager.get_all_pursuers()[0]
-        pursuer.update_lidar()
+        rl_agent_pursuer: Quadcopter = self.entities_manager.get_all_pursuers()[
+            self.RL_AGENT_PERSUER_ID]
+        rl_agent_pursuer.update_lidar()
 
-        inertial_data: np.ndarray = self.process_inertial_state(pursuer)
-        pursuer.lidar_data
+        inertial_data: np.ndarray = self.process_inertial_state(
+            rl_agent_pursuer)
+        rl_agent_pursuer.lidar_data
 
-        lidar: np.ndarray = pursuer.lidar_data.get(
+        lidar: np.ndarray = rl_agent_pursuer.lidar_data.get(
             "lidar",
             np.zeros(
-                pursuer.lidar_shape,
+                rl_agent_pursuer.lidar_shape,
                 dtype=np.float32,
             ),
         )
 
-        gun_state = pursuer.gun_state
+        gun_state = rl_agent_pursuer.gun_state
 
         inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0).astype(
             np.float32
@@ -271,7 +299,10 @@ class Level5Environment(Env):
         )
 
     def observation_shape(self) -> dict:
-        pursuer = self.entities_manager.get_all_pursuers()[0]
+        """
+        Shape from RL AGENT PERSUER.
+        """
+        rl_agent_persuer = self.entities_manager.get_all_pursuers()[self.RL_AGENT_PERSUER_ID]
 
         position = 3
         velocity = 3
@@ -281,10 +312,10 @@ class Level5Environment(Env):
 
         inertial_data = position + velocity + attitude + angular_rate + gun_state
 
-        lidar_shape = pursuer.lidar_shape
+        lidar_shape = rl_agent_persuer.lidar_shape
         last_action_shape = 4
 
-        gun_state_shape = pursuer.gun_state_shape
+        gun_state_shape = rl_agent_persuer.gun_state_shape
 
         return {
             "lidar": lidar_shape,
@@ -317,20 +348,24 @@ class Level5Environment(Env):
 
     ################################################################################
 
-    def get_keymap(self):
-        keycode = KeyCode()
-        default_action = [0, 0, 0, 1]
 
-        key_map = defaultdict(lambda: default_action)
-        key_map.update(
-            {
-                Key.up: [0, 1, 0, 1],
-                Key.down: [0, -1, 0, 1],
-                Key.left: [-1, 0, 0, 1],
-                Key.right: [1, 0, 0, 1],
-                keycode.from_char("e"): [0, 0, 1, 1],
-                keycode.from_char("d"): [0, 0, -1, 1],
-            }
-        )
+    def get_keymap(self):
+        key_map = defaultdict(lambda: [0, 0, 0, 1])  # default action
+
+        if not PYNPUT_AVAILABLE or pynput_keyboard is None:
+            print("⚠️ pynput indisponível. Algumas funcionalidades estão desativadas.")
+            return key_map
+
+        Key = pynput_keyboard.Key
+        KeyCode = pynput_keyboard.KeyCode
+
+        key_map |= {
+            Key.up: [0, 1, 0, 1],
+            Key.down: [0, -1, 0, 1],
+            Key.left: [-1, 0, 0, 1],
+            Key.right: [1, 0, 0, 1],
+            KeyCode.from_char("e"): [0, 0, 1, 1],
+            KeyCode.from_char("d"): [0, 0, -1, 1],
+        }
 
         return key_map

@@ -9,5 +9,7 @@ class TasksDispatcher:
 
     @staticmethod
     def level5_tasks(dome_radius, quadcopter_manager) -> "list[Task]":
+        print("[TasksDispatcher] Dispatching Level 5 tasks")
+        
         return [Level5_Task(quadcopter_manager, dome_radius)]
 

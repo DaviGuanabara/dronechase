@@ -28,30 +28,8 @@ from typing import Optional, Union, NamedTuple, Dict, List, cast
 
 from typing import Tuple
 
-"""
-Exp03_Task is a task that uses the KamikazeNavigator to control the Loitering Munition and 
-uses RL agent to control the first pursuer. The second persuer is controlled by an BT
-The idea is to benchmark the agent with the behavior tree in same conditions.
 
-This is a TRAINING task, where the episode ends when the agent dies
-
-The Reward here were engineered to be sparse, taking account of enemies attacks.
-
-self.NUM_PURSUERS = 2
-self.munition_per_defender = 20
-6 meters
-
-dome_radius: float = 20
-"""
-
-
-"""
-
-[ ] - Corrigir o Shoot de tal forma que retorne quem atirou no kamikaze, um loyalwingman ou o agent
-[ ] - Reward de 50% ou 80% quando o lw matar um kamikaze
-[x] - Remover a area protegida do termination e do reward
-[x] - Setu Loyalwingmen BT
-"""
+print("[ThreatSense] Importing Level 5 Task...")
 
 
 class Level5_Task(Task):
@@ -68,6 +46,7 @@ class Level5_Task(Task):
         self.dome_radius = dome_radius
         self.entities_manager = entities_manager
 
+        print("init constants and globals")
         self.init_constants()
         self.init_globals()
 
@@ -86,36 +65,39 @@ class Level5_Task(Task):
             building_position
         )
         self.loyalwingman_navigator = LoyalWingmanBehaviorTree(building_position)
+        
+        print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
 
     def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
         self.current_step = message.get("step", 0)
         self.timestep = message.get("timestep", 0)
 
     def init_constants(self):
-        # self.MAX_BUILDING_LIFE = 1
-
-        self.NUM_PURSUERS = 2
-        self.munition_per_defender = 20
-
-        self.MAX_NUMBER_OF_ROUNDS = self.calculate_rounds(
-            self.NUM_PURSUERS, self.munition_per_defender
-        )
-
-        self.NUM_INVADERS = self.MAX_NUMBER_OF_ROUNDS
+        self.NUM_PURSUERS = 6
+        self.MUNITION_PER_DEFENDER = 20
+        self.NUM_INVADERS = 12  # 👈 pode ser > MAX_NUMBER_OF_ROUNDS
 
         self.MAX_REWARD = 1000
 
-        self.ENEMY_BORN_RADIUS = 6  # 8  # 6
+        self.ENEMY_BORN_RADIUS = 6
         self.INVADER_EXPLOSION_RANGE = 0.2
         self.PURSUER_SHOOT_RANGE = 1
 
-        self.STEP_INCREMENT = 100  # Increment 6 seconds in time for each kill
-        self.MAX_STEP = 300  # 300 calls = 20 seconds for rl_frequency = 15
+        self.STEP_INCREMENT = 100
+        self.MAX_STEP = 300
 
-        # self.building_position = np.array([0, 0, 1])
+        # Round inicial arbitrário, pode ser >= 1
+        self.INITIAL_ROUND = 1
+        # Total máximo de rounds possíveis, baseados em munição
+        self.MAX_NUMBER_OF_ROUNDS = self.calculate_max_rounds(
+            self.NUM_PURSUERS, self.MUNITION_PER_DEFENDER, self.NUM_INVADERS)
+        # Número de inimigos pode ser arbitrário (ex: para gerar oclusão, complexidade)
+        
 
-        self.INITIAL_ROUND = 1  # 3  # 3  # 1
-        # print("Initial Round:", self.INITIAL_ROUND)
+        
+
+        print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
+        print(f"[INIT] NUM_INVADERS: {self.NUM_INVADERS}")
 
     def init_globals(self):
         self.current_step = 0
@@ -169,16 +151,7 @@ class Level5_Task(Task):
         # self.entities_manager.disarm_all_invaders()
 
         self.setup_round(self.current_round)
-        # print(f"Round {self.current_round} of {self.MAX_NUMBER_OF_ROUNDS} Started")
-        # print(self.entities_manager.get_armed_invaders())
-        # print(self.entities_manager.get_armed_pursuers())
-
-        # print(
-        #    f"Round {self.current_round} of {self.MAX_NUMBER_OF_ROUNDS} Started, {len(self.entities_manager.get_armed_invaders())} invaders and {len(self.entities_manager.get_armed_pursuers())} pursuers"
-        # )
-        self.offset_handler.on_episode_start()
-        self.kamikaze_navigator.reset()
-        self.loyalwingman_navigator.reset()
+        self._extracted_from_on_episode_start_19()
 
     def get_round(self) -> int:
         return self.current_round
@@ -201,35 +174,63 @@ class Level5_Task(Task):
             self.entities_manager.replace_quadcopter(invaders[i], positions[i])
             self.entities_manager.arm_by_quadcopter(invaders[i])
 
-    def calculate_rounds(self, num_defenders, munition_per_defender):
-        """
-        Calculate the number of episodes based on the number of defenders and the munition each defender has.
 
-        Args:
-        num_defenders (int): The number of defenders.
-        munition_per_defender (int): The munition each defender has.
+    def calculate_max_rounds(self, num_pursuers: int, munition_per_defender: int, initial_invaders: int) -> int:
+        """
+        Calculates the maximum number of rounds given:
+
+        - The number of defenders (pursuers),
+        - The amount of ammunition per defender,
+        - The initial number of invaders in round 1.
+
+        The number of invaders increases incrementally with each round:
+            Round 1: a
+            Round 2: a + 1
+            Round 3: a + 2
+            ...
+            Round R: a + (R - 1)
+
+        The total number of invaders over R rounds is:
+            S = (R / 2) * [2a + (R - 1)]
+
+        Let:
+            R     = number of rounds,
+            a     = number of invaders in the first round,
+            T_ab  = total number of possible kills = num_pursuers * munition_per_defender + 1
+
+        Then we have the inequality:
+            R * (2a + R - 1) <= 2 * T_ab
+            => R² + (2a - 1)R - 2T_ab <= 0
+
+        Solving the quadratic equation:
+            Δ = (2a - 1)² + 8 * T_ab
+            R = [-(2a - 1) + sqrt(Δ)] / 2
+
+        Only the positive root is considered since the number of rounds must be positive.
+
+        Parameters:
+        ----------
+        num_pursuers : int
+            Total number of allied drones (defenders).
+        munition_per_defender : int
+            Ammunition available per pursuer.
+        initial_invaders : int
+            Number of invaders in the first round.
 
         Returns:
-        int: The number of episodes that can be created.
+        -------
+        int
+            The maximum number of possible rounds (rounded down).
         """
-        # Total munitions available across all defenders
-        total_munitions = num_defenders * munition_per_defender
+        total_abates = num_pursuers * munition_per_defender + 1 # # +1 to account for the suicidal behavior of the agent
+        a = initial_invaders
 
-        # Solving the quadratic equation n^2 + n - 2 * total_munitions = 0
-        a = 1
-        b = 1
-        c = -2 * total_munitions
+        b = 2 * a - 1
+        delta = b**2 + 8 * total_abates
 
-        # Calculate the discriminant
-        discriminant = b**2 - 4 * a * c
+        sol = (-b + math.sqrt(delta)) / 2
+        return math.ceil(sol)
 
-        # Calculate the two solutions
-        sol2 = (-b + math.sqrt(discriminant)) / (2 * a)
-
-        # We need the positive root and floor it since episodes are discrete
-        n_episodes = math.ceil(sol2)
-
-        return n_episodes
 
     # ===============================================================================
     # On Notification
@@ -254,11 +255,13 @@ class Level5_Task(Task):
 
     def on_env_init(self):
         self._stage_status = TaskStatus.RUNNING
-        # print("Spawning invaders and pursuers")
+        print("level 5_Task - on_env_init - Spawning invaders and pursuers")
         self.spawn_invader_squad()
         self.spawn_pursuer_squad()
 
     def on_reset(self):
+
+        print("level 5 task - on reset")
         self.on_episode_end()
         self.on_episode_start()
 
@@ -268,8 +271,11 @@ class Level5_Task(Task):
 
         self.entities_manager.arm_all_pursuers()
         self.replace_pursuers()
-        self.offset_handler.on_episode_start()
+        self._extracted_from_on_episode_start_19()
 
+    # TODO Rename this here and in `advance_round` and `on_episode_start`
+    def _extracted_from_on_episode_start_19(self):
+        self.offset_handler.on_episode_start()
         self.kamikaze_navigator.reset()
         self.loyalwingman_navigator.reset()
 
@@ -375,9 +381,7 @@ class Level5_Task(Task):
 
         to_disarm: list = []
         for pursuer_id in list(identified_invaders_nearby.keys()):
-            to_disarm.append(pursuer_id)
-            to_disarm.append(identified_invaders_nearby[pursuer_id][0])
-
+            to_disarm.extend((pursuer_id, identified_invaders_nearby[pursuer_id][0]))
             self.entities_manager.disarm_by_ids(to_disarm)
             pursuer_munition = self.entities_manager.get_quadcopters(id=pursuer_id)[
                 0
@@ -387,7 +391,7 @@ class Level5_Task(Task):
             if pursuer_munition == 0 and pursuer_id == agent_id:
                 agent_suicided += 1
 
-            elif pursuer_munition == 0 and pursuer_id != agent_id:
+            elif pursuer_munition == 0:
                 pursuer_suicided += 1
 
             else:
@@ -406,15 +410,14 @@ class Level5_Task(Task):
         successful_allies_shots = 0
 
         for pursuer_id in list(identified_invaders_nearby.keys()):
-            were_successful = self.entities_manager.shoot_by_ids(
+            if were_successful := self.entities_manager.shoot_by_ids(
                 pursuer_id, identified_invaders_nearby[pursuer_id][0]
-            )
+            ):
+                if pursuer_id == agent.id:
+                    successful_rl_agent_shots += 1
 
-            if were_successful and pursuer_id == agent.id:
-                successful_rl_agent_shots += 1
-
-            if were_successful and pursuer_id != agent.id:
-                successful_allies_shots += 1
+                if pursuer_id != agent.id:
+                    successful_allies_shots += 1
 
         return successful_rl_agent_shots, successful_allies_shots
 
@@ -433,7 +436,7 @@ class Level5_Task(Task):
         pursuers_exploded=0,
         pursuer_suicided=0,
         agent_suicided=0,
-    ):
+    ):  # sourcery skip: low-code-quality
         # Initialize reward components
         score, bonus, penalty = 0, 0, 0
         agent = self.entities_manager.get_all_pursuers()[0]
@@ -569,10 +572,7 @@ class Level5_Task(Task):
 
         # O QUE DEU MELHOR ANTES NÃO TINHA ISSO
         position = agent.inertial_data["position"]
-        if position[2] < -5.99:  # 0.01:
-            return True
-
-        return False
+        return position[2] < -5.99
 
     def compute_info(self):
         return {
@@ -648,8 +648,14 @@ class Level5_Task(Task):
             positions, "Agent", lidar_radius=2 * self.dome_radius
         )
 
+        i = 0
         for pursuer in pursuers:
-            pursuer.set_munition(self.munition_per_defender)
+            print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
+            pursuer.set_munition(self.MUNITION_PER_DEFENDER)
+            i =+ 1
+
+        print(f"[DEBUG] Spawning pursuer {i+1} of {self.NUM_PURSUERS}")
+
 
     def get_invaders_positions(self):
         invaders = self.entities_manager.get_all_invaders()

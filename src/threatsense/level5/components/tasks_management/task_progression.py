@@ -64,7 +64,8 @@ class Task(ABC):
     def status(self):
         return TaskStatus.FAILURE
 
-
+print("Task class initialized. This is an abstract class and should not be instantiated directly.")
+print("from level 5")
 class TaskProgression:
     """Curriculum Learning for the Level 3 Problem."""
 
@@ -83,9 +84,11 @@ class TaskProgression:
     def update_current_stage(self):
         """Update the current stage based on the stage number."""
         self.current_stage = self.tasks_dispatch[self._current_stage_number]
+        print(f"Current stage: {self.current_stage.__class__.__name__} (Stage {self._current_stage_number})")
 
     def on_env_init(self):
-        print("task progression - on env init")
+        print("Level 5 - task progression - on env init")
+        print(f"Initializing stage: {self.current_stage.__class__.__name__}")
         self.current_stage.on_env_init()
 
     def on_episode_start(self):

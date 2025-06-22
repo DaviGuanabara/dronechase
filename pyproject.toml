@@ -20,7 +20,7 @@ viz = [
     "seaborn (>=0.13.2,<0.14.0)",
     "tensorboard (>=2.19.0,<3.0.0)"
 ]
-platform_input = [
+interactive = [
     "pynput (>=1.8.1,<2.0.0); sys_platform != 'darwin'",
 ]
 

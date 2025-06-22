@@ -11,7 +11,7 @@ from core.entities.entity_type import EntityType
 import threading
 from core.entities.immovable_structures.immovable_structures import ImmovableStructures
 from core.entities.navigators.loitering_munition_navigator import KamikazeNavigator
-
+import inspect
 
 class EntitiesManager:
     # ===========================================================================
@@ -67,6 +67,8 @@ class EntitiesManager:
         lidar_radius: float = 5,
     ) -> List[Quadcopter]:
         # Check if names is a list, if not, convert it to a list
+
+        stack = inspect.stack()
         if not isinstance(names, list):
             names = [names]
 
@@ -105,6 +107,9 @@ class EntitiesManager:
         names: Union[List[str], str] = "no_name",
         lidar_radius: float = 5,
     ) -> List[Quadcopter]:
+        
+        print("[DEBUG] EntitiesManager: spawning pursuer")
+
         return self.spawn_quadcopter(
             positions, EntityType.LOYALWINGMAN, names, lidar_radius
         )

@@ -85,7 +85,8 @@ class TaskProgression:
         self.current_stage = self.tasks_dispatch[self._current_stage_number]
 
     def on_env_init(self):
-        print("task progression - on env init")
+        print("[ThreatEngage] Level 4 - task progression - on env init")
+        print(f"Current stage: {self._current_stage_number}")
         self.current_stage.on_env_init()
 
     def on_episode_start(self):

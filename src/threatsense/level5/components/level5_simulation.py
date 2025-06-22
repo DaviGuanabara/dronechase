@@ -7,12 +7,20 @@ import pybullet as p
 import pybullet_data
 from pybullet_utils import bullet_client
 
+print("[ThreatSense] Importing Level 5 Aviary Simulation...")
+print("loading quadcopter module...")
 from core.entities.quadcopters.quadcopter import Quadcopter
 
 
 
-class L4AviarySimulation(bullet_client.BulletClient):
+class L5AviarySimulation(bullet_client.BulletClient):
     """Aviary class, the core of how PyFlyt handles UAVs in the PyBullet simulation environment.
+
+    This is the Level 5 Aviary Simulation, made for an extension of the PyFlyt framework.
+    The objective is:
+    - 5 Allies
+    - Increased enemy presence
+    - Attention Neural Network to Lidar data
 
     The `aviary` is a handler for physics stepping, setpoint handling, collisions tracking, and much more.
     It provides a common endpoint from where users may control drones or define tasks.
@@ -141,7 +149,7 @@ class L4AviarySimulation(bullet_client.BulletClient):
 
 def on_avaluation_step():
     print("Creating environment")
-    simulation = L4AviarySimulation(render=True)
+    simulation = L5AviarySimulation(render=True)
     print("Environment created")
 
     for i in range(1000):

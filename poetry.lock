@@ -176,7 +176,7 @@ description = "Bindings to the Linux input handling subsystem"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "sys_platform != \"darwin\" and extra == \"platform-input\" and \"linux\" in sys_platform"
+markers = "sys_platform != \"darwin\" and extra == \"interactive\" and \"linux\" in sys_platform"
 files = [
     {file = "evdev-1.9.1.tar.gz", hash = "sha256:dc640a064cb1c9fe1f8b970dc2039945a2a275d7b7ee62284bf427238abe45ee"},
 ]
@@ -1422,7 +1422,7 @@ description = "Monitor and control user input devices"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "sys_platform != \"darwin\" and extra == \"platform-input\""
+markers = "sys_platform != \"darwin\" and extra == \"interactive\""
 files = [
     {file = "pynput-1.8.1-py2.py3-none-any.whl", hash = "sha256:42dfcf27404459ca16ca889c8fb8ffe42a9fe54f722fd1a3e130728e59e768d2"},
     {file = "pynput-1.8.1.tar.gz", hash = "sha256:70d7c8373ee98911004a7c938742242840a5628c004573d84ba849d4601df81e"},
@@ -1470,7 +1470,7 @@ description = "Python X Library"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "sys_platform != \"darwin\" and extra == \"platform-input\" and \"linux\" in sys_platform"
+markers = "sys_platform != \"darwin\" and extra == \"interactive\" and \"linux\" in sys_platform"
 files = [
     {file = "python-xlib-0.33.tar.gz", hash = "sha256:55af7906a2c75ce6cb280a584776080602444f75815a7aff4d287bb2d7018b32"},
     {file = "python_xlib-0.33-py2.py3-none-any.whl", hash = "sha256:c3534038d42e0df2f1392a1b30a15a4ff5fdc2b86cfa94f072bf11b10a164398"},
@@ -1996,10 +1996,10 @@ MarkupSafe = ">=2.1.1"
 watchdog = ["watchdog (>=2.3)"]
 
 [extras]
-platform-input = ["pynput"]
+interactive = ["pynput"]
 viz = ["seaborn", "tensorboard"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "19820a55d91c9d641136338f4215e82cb86885486ba9b905589a03776aff319e"
+content-hash = "f9a710beec0fdb982d7bc4f097c47ac6daad6f1d0830cf890f67fc0c1e463d52"

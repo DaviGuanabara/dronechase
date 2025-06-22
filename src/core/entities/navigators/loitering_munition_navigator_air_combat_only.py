@@ -77,16 +77,16 @@ class KamikazeNavigator(Navigator):
         invader_position = agent.inertial_data["position"]
         pursuers_positions = offset_handler.get_purusers_positions()
 
-        # print("invader_position",invader_position,"pursuers_positions",pursuers_positions,)
-        for point in pursuers_positions:
-            if GeometryUtils.is_point_inside_cone(
-                point, invader_position, self.building_position, degrees
-            ):
-                return False
-
-        # return True
-        # ALWAYS FALSE. This is a hack to make the kamikaze go directly to the AGENTS, making air combat only.
-        return False
+        return next(
+            (
+                False
+                for point in pursuers_positions
+                if GeometryUtils.is_point_inside_cone(
+                    point, invader_position, self.building_position, degrees
+                )
+            ),
+            False,
+        )
 
     def _are_wingmen_alive(self, offset_handler) -> bool:
         return len(offset_handler.get_purusers_positions()) > 0
@@ -140,11 +140,11 @@ class WaitState(State):
     ):
         if navigator._is_building_path_clear(offset_handler, agent, degrees=60):
             navigator.change_state(agent, CollideWithBuildingState())
-        else:
-            if navigator._are_wingmen_alive(offset_handler):
-                closest_pursuer = offset_handler.identify_closest_pursuer(agent.id)
-                if closest_pursuer:
-                    navigator.change_state(agent, CollideWithWingmanState())
+        elif navigator._are_wingmen_alive(offset_handler):
+            if closest_pursuer := offset_handler.identify_closest_pursuer(
+                agent.id
+            ):
+                navigator.change_state(agent, CollideWithWingmanState())
 
     def execute(
         self,
