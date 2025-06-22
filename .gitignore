@@ -62,3 +62,9 @@ docs/_build/
 _build/
 site/
 *.code-workspace
+
+
+
+
+
+**/.DS_Store    
