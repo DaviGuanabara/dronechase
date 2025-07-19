@@ -7,13 +7,12 @@ from enum import Enum, auto
 from PyFlyt.core.drones.quadx import QuadX  # type: ignore
 from pybullet_utils.bullet_client import BulletClient  # type: ignore
 
-from components.sensors.fused_lidar import FusedLiDAR
+
 # =================================================================================================================
 # Components
 # =================================================================================================================
 
-
-from core.entities.quadcopters.components import LiDAR, InertialMeasurementUnit, FlightStateDataType, FlightStateManager, Gun
+from core.entities.quadcopters.components import LIDAR, FusedLiDAR, InertialMeasurementUnit, FlightStateDataType, FlightStateManager, Gun
 from core.entities.entity_type import EntityType
 from core.notification_system import Topics_Enum, MessageHub
 
@@ -36,7 +35,7 @@ class Quadcopter:
         lidar_resolution: int = 16,
         shoot_range: float = 0.8,
         formation_position: np.ndarray = np.array([0, 0, 0]),
-        lidar_class=LiDAR
+        lidar_class=LIDAR
     ):
         self.quadx = quadx
         self.formation_position = formation_position
@@ -134,7 +133,7 @@ class Quadcopter:
 
         # print(f"Lidar Radius: {lidar_radius}")
 
-        lidar_class = FusedLiDAR if use_fused_lidar else LiDAR
+        lidar_class = FusedLiDAR if use_fused_lidar else LIDAR
 
         return Quadcopter(
             simulation=simulation,
@@ -181,7 +180,7 @@ class Quadcopter:
             debug_on=debug_on,
             lidar_on=lidar_on,
             formation_position=position,
-            lidar_class=LiDAR
+            lidar_class=LIDAR
         )
 
     # =================================================================================================================
@@ -215,6 +214,23 @@ class Quadcopter:
             topic=Topics_Enum.INERTIAL_DATA_BROADCAST.value,
             subscriber=self._subscriber_inertial_data,
         )
+
+        self.messageHub.subscribe(
+            topic=Topics_Enum.LIDAR_DATA_BROADCAST.value,
+            subscriber=self._subscriber_lidar_data
+        )
+
+    def _subscriber_lidar_data(self, message: Dict, publisher_id: int):
+        """
+        Handle incoming LiDAR data from the message hub.
+
+        Parameters:
+        - message (Dict): The LiDAR data received.
+        - publisher_id (int): The ID of the publisher of the data.
+        """
+        # print(f"Received lidar data from {publisher_id}")
+        if self.lidar_on:
+            self.lidar.buffer_lidar_data(message, publisher_id)
 
     def _publish_inertial_data(self):
         # TODO: broadcast with current step

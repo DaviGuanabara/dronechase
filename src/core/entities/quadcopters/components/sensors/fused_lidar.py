@@ -1,4 +1,5 @@
-from lidar import LiDAR
+
+from core.entities.quadcopters.components.sensors.lidar import LIDAR
 from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import Topics_Enum
 
@@ -7,7 +8,7 @@ import random
 import time
 
 
-class FusedLiDAR(LiDAR):
+class FusedLiDAR(LIDAR):
     """
     FusedLiDAR estende a classe LiDAR para permitir a fusão de dados de sensores 
     de múltiplos drones aliados, com objetivo de fornecer observações mais ricas 
@@ -35,6 +36,13 @@ class FusedLiDAR(LiDAR):
     USO:
         lidar = FusedLiDAR(...)
         lidar.enable_fusion()  # ativa a lógica de fusão
+
+        
+    O lidar pega a posição de todos os drones. 
+    Ele recebe essas posições através da classe quadcopter, que por sua vez, subscreve no canal de mensagens
+    e recebe as atualizações do IMU. No caso dos dados do LiDAR, o FusedLiDAR recebe, adicionalmente a saída anterior.
+
+    Mas no meu caso, preciso também receber a leitura do LiDAR de todos os drones aliados.
 
     TODOs:
     [ ] FAZER COISA 1: Implementar compensação por orientação relativa (ajuste rotacional entre drones)

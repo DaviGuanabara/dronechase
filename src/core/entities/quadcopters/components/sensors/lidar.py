@@ -4,54 +4,24 @@ from typing import Tuple, List, Dict
 import pybullet as p # type: ignore
 from gymnasium import spaces
 
-from core.entities.quadcopters.components.sensors.sensor_interface import Sensor
+from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, LiDARBufferManager, CoordinateConverter
 from core.entities.entity_type import EntityType
 
 # from ....entity_type import EntityType
 # from ..base.quadcopter_type import ObjectType
 
 
-from enum import Enum, auto
 
 
-class Channels(Enum):
-    DISTANCE_CHANNEL = 0
-    FLAG_CHANNEL = 1
 
 
-class LiDARBufferManager:
-    def __init__(self):
-        self.buffer = {}
-
-    def buffer_message(self, message: Dict, publisher_id: int):
-        self.buffer[str(publisher_id)] = message
-
-    def clear_buffer_data(self, publisher_id: int) -> None:
-        self.buffer.pop(str(publisher_id), None)
-
-    def get_all_data(self) -> Dict:
-        return self.buffer
 
 
-class CoordinateConverter:
-    @staticmethod
-    def spherical_to_cartesian(spherical: np.ndarray) -> np.ndarray:
-        radius, theta, phi = spherical
-        x = radius * np.sin(theta) * np.cos(phi)
-        y = radius * np.sin(theta) * np.sin(phi)
-        z = radius * np.cos(theta)
-        return np.array([x, y, z])
-
-    @staticmethod
-    def cartesian_to_spherical(cartesian: np.ndarray) -> np.ndarray:
-        x, y, z = cartesian
-        radius = np.sqrt(x**2 + y**2 + z**2)
-        theta = np.arccos(z / radius)
-        phi = np.arctan2(y, x)
-        return np.array([radius, theta, phi])
 
 
-class LiDAR(Sensor):
+
+
+class LIDAR(BaseLidar):
     """
     This class aims to simulate a spherical LiDAR reading. It uses physics convention for spherical coordinates (radius, theta, phi).
     In this convention, theta is the polar angle and varies between 0 and +pi, from z to xy plane.
@@ -319,13 +289,16 @@ class LiDAR(Sensor):
         self.reset()
 
         for target_id, message in buffer_data.items():
-            position = message.get("position")
+            publisher_type = message.get("publisher_type")
+            if publisher_type is None:
+                continue  # ignora mensagens malformadas ou incompletas
 
             position, extremity_points = self.process_message(message)
-            # print(message.get("publisher_type"))
+
             self._add_end_position_for_entity(
-                position, message.get("publisher_type"), target_id
+                position, publisher_type, target_id
             )
+
 
     def read_data(self) -> Dict:
         return {"lidar": self.sphere}

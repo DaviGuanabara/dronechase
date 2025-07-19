@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple, List, Dict
 import pybullet as p
 
-from core.entities.quadcopters.components.sensors.sensor_interface import Sensor
+from core.entities.quadcopters.components.sensors.interfaces.sensor_interface import Sensor
 from PyFlyt.core.drones.quadx import QuadX
 
 """
