@@ -11,7 +11,7 @@ from threatsense.level5.components.entities_manager import EntitiesManager, Quad
 from core.context.offsets_handler import OffsetHandler
 
 from core.notification_system.message_hub import MessageHub
-from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import TopicsEnum
 from core.entities.immovable_structures.immovable_structures import ImmovableStructures
 
 # Problema aqui. LoyalwingmanBehaviorTree vem do core, que aponta pro level4.
@@ -56,7 +56,7 @@ class Level5_Task(Task):
 
         self.messageHub = MessageHub()
         self.messageHub.subscribe(
-            topic=Topics_Enum.AGENT_STEP_BROADCAST.value,
+            topic=TopicsEnum.AGENT_STEP_BROADCAST,
             subscriber=self._subscriber_simulation_step,
         )
 

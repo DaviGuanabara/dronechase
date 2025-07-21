@@ -1,6 +1,6 @@
 import numpy as np
 
-from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import TopicsEnum
 from typing import Dict
 from gymnasium import spaces, Env
 from pynput.keyboard import Key, KeyCode
@@ -67,7 +67,7 @@ class Exp03vFinalEnvironment(Env):
     def setup_messange_hub(self):
         self.message_hub = MessageHub()
         self.message_hub.subscribe(
-            topic="Simulation", subscriber=self._subscriber_notifications
+            topic=TopicsEnum.SIMULATION, subscriber=self._subscriber_notifications
         )
 
     def _subscriber_notifications(self, message, publisher_id):
@@ -173,7 +173,7 @@ class Exp03vFinalEnvironment(Env):
 
         self.step_counter += 1
         self.message_hub.publish(
-            Topics_Enum.AGENT_STEP_BROADCAST.value,
+            TopicsEnum.AGENT_STEP_BROADCAST,
             {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
             0,
         )

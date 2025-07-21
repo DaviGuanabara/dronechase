@@ -12,7 +12,7 @@ from threatengage.environments.level4.components.entities_management.offsets_han
 from core.entities.navigators.loitering_munition_navigator import KamikazeNavigator
 from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 from core.notification_system.message_hub import MessageHub
-from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import TopicsEnum
 from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 
 from typing import Optional, Union, NamedTuple, Dict, List, cast
@@ -58,7 +58,7 @@ class Exp02_V2_Full_Task(Task):
 
         self.messageHub = MessageHub()
         self.messageHub.subscribe(
-            topic=Topics_Enum.AGENT_STEP_BROADCAST.value,
+            topic=TopicsEnum.AGENT_STEP_BROADCAST,
             subscriber=self._subscriber_simulation_step,
         )
 

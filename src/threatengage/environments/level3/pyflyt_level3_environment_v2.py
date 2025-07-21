@@ -14,7 +14,7 @@ from threatengage.environments.level3.components.stages import L3Stage1 as Stage
 
 from core.notification_system.message_hub import MessageHub
 from core.entities.quadcopters.quadcopter import Quadcopter
-from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import TopicsEnum
 
 
 class PyflytL3EnviromentV2(Env):
@@ -52,7 +52,7 @@ class PyflytL3EnviromentV2(Env):
         self.observation_space = self._observation_space()
 
         self.message_hub.subscribe(
-            topic="Simulation", subscriber=self._subscriber_notifications
+            topic=TopicsEnum.SIMULATION, subscriber=self._subscriber_notifications
         )
 
     def _subscriber_notifications(self, message, publisher_id):
@@ -147,7 +147,7 @@ class PyflytL3EnviromentV2(Env):
 
         self.step_counter += 1
         self.message_hub.publish(
-            Topics_Enum.AGENT_STEP_BROADCAST.value,
+            TopicsEnum.AGENT_STEP_BROADCAST,
             {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
             0,
         )

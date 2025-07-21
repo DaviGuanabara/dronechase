@@ -2,7 +2,7 @@ from typing import Dict, Optional
 import random
 import numpy as np
 
-from core.notification_system import MessageHub, Topics_Enum
+from core.notification_system import MessageHub, TopicsEnum
 
 class Gun:
     def __init__(
@@ -37,7 +37,7 @@ class Gun:
         # TODO: I have to change the name SimulationStep to RL_Step, to ensure that the name is consistent, meaning that the step
         # is related to RL not Simulation. 1 step = 1 RL decision.
         self.messageHub.subscribe(
-            topic=Topics_Enum.AGENT_STEP_BROADCAST.value,
+            topic=TopicsEnum.AGENT_STEP_BROADCAST,
             subscriber=self._subscriber_simulation_step,
         )
 

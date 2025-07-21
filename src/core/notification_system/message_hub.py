@@ -1,4 +1,4 @@
-
+from core.notification_system.topics_enum import TopicsEnum
 from core.notification_system.broker import Broker
 from typing import Dict, Callable, Any, List, Optional
 import threading
@@ -14,27 +14,27 @@ class MessageHub:
             
     def _initialize(self) -> None:
         """Initialize attributes for the instance."""
-        self._brokers: Dict[str, Broker] = {}
-        self._publishers_dict: Dict[int, List[str]] = {}
+        self._brokers: Dict[TopicsEnum, Broker] = {}
+        self._publishers_dict: Dict[int, List[TopicsEnum]] = {}
 
-    def get_broker(self, topic: str) -> Broker:
+    def get_broker(self, topic: TopicsEnum) -> Broker:
         """Get or create a broker for a specific topic."""
         return self._brokers.setdefault(topic, Broker())
 
-    def subscribe(self, topic: str, subscriber: Callable[[Any, int], None]) -> None:
+    def subscribe(self, topic: TopicsEnum, subscriber: Callable[[Any, int], None]) -> None:
         """Subscribe to a specific topic."""
         self.get_broker(topic).subscribe(topic, subscriber)
 
-    def unsubscribe(self, topic: str, subscriber: Callable[[Any, int], None]) -> None:
+    def unsubscribe(self, topic: TopicsEnum, subscriber: Callable[[Any, int], None]) -> None:
         """Unsubscribe from a specific topic."""
         self.get_broker(topic).unsubscribe(topic, subscriber)
 
-    def publish(self, topic: str, message: Dict, publisher_id: int) -> None:
+    def publish(self, topic: TopicsEnum, message: Dict, publisher_id: int) -> None:
         """Publish a message to a topic."""
         self._register_publisher(topic, publisher_id)
         self.get_broker(topic).publish(topic, message, publisher_id)
 
-    def terminate(self, publisher_id: int, topic: Optional[str] = None) -> None:
+    def terminate(self, publisher_id: int, topic: Optional[TopicsEnum] = None) -> None:
         if topic:
             # Terminate the specific topic
             self._unregister_publisher_topic(topic, publisher_id)
@@ -42,7 +42,7 @@ class MessageHub:
             # Terminate all topics for the publisher
             self._unregister_publisher(publisher_id)
     
-    def _register_publisher(self, topic: str, publisher_id: int):
+    def _register_publisher(self, topic: TopicsEnum, publisher_id: int):
         """Register a publisher for a specific topic."""
         if publisher_id not in self._publishers_dict:
             self._publishers_dict[publisher_id] = []
@@ -60,8 +60,7 @@ class MessageHub:
         if publisher_id in self._publishers_dict:
             del self._publishers_dict[publisher_id]
                  
-            
-    def _unregister_publisher_topic(self, topic: str, publisher_id: int):
+    def _unregister_publisher_topic(self, topic: TopicsEnum, publisher_id: int):
         """Unregister a publisher and send termination messages to all its topics."""
         
         self.publish(topic=topic, message={"termination": True}, publisher_id=publisher_id)

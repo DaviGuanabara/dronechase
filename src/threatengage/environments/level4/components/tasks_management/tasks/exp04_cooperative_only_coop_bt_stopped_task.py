@@ -12,7 +12,7 @@ from threatengage.environments.level4.components.entities_management.entities_ma
 from threatengage.environments.level4.components.entities_management.offsets_handler import OffsetHandler
 
 from core.notification_system.message_hub import MessageHub
-from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import TopicsEnum
 from core.entities.immovable_structures.immovable_structures import ImmovableStructures
 from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 from core.entities.navigators.loitering_munition_navigator_air_combat_only import (
@@ -72,7 +72,7 @@ class Exp04_Cooperative_Only_BT_Stopped_Task(Task):
 
         self.messageHub = MessageHub()
         self.messageHub.subscribe(
-            topic=Topics_Enum.AGENT_STEP_BROADCAST.value,
+            topic=TopicsEnum.AGENT_STEP_BROADCAST,
             subscriber=self._subscriber_simulation_step,
         )
 

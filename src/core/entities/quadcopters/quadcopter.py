@@ -14,7 +14,7 @@ from pybullet_utils.bullet_client import BulletClient  # type: ignore
 
 from core.entities.quadcopters.components import LIDAR, FusedLiDAR, InertialMeasurementUnit, FlightStateDataType, FlightStateManager, Gun
 from core.entities.entity_type import EntityType
-from core.notification_system import Topics_Enum, MessageHub
+from core.notification_system import TopicsEnum, MessageHub
 
 # TODO: remove subscrition of current step of the components, i should centralize this here (at quadcopter class).
 # TODO: make function called hit, it will be used instead of disarm.
@@ -211,12 +211,12 @@ class Quadcopter:
     def setup_message_hub(self):
         self.messageHub = MessageHub()
         self.messageHub.subscribe(
-            topic=Topics_Enum.INERTIAL_DATA_BROADCAST.value,
+            topic=TopicsEnum.INERTIAL_DATA_BROADCAST,
             subscriber=self._subscriber_inertial_data,
         )
 
         self.messageHub.subscribe(
-            topic=Topics_Enum.LIDAR_DATA_BROADCAST.value,
+            topic=TopicsEnum.LIDAR_DATA_BROADCAST,
             subscriber=self._subscriber_lidar_data
         )
 
@@ -244,7 +244,7 @@ class Quadcopter:
         # print(message)
         # print("Publishing intertial data")
         self.messageHub.publish(
-            topic=Topics_Enum.INERTIAL_DATA_BROADCAST.value,
+            topic=TopicsEnum.INERTIAL_DATA_BROADCAST,
             message=message,
             publisher_id=self.id,
         )

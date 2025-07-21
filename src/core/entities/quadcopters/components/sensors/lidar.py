@@ -6,19 +6,9 @@ from gymnasium import spaces
 
 from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, LiDARBufferManager, CoordinateConverter
 from core.entities.entity_type import EntityType
-
+from core.notification_system.topics_enum import TopicsEnum
 # from ....entity_type import EntityType
 # from ..base.quadcopter_type import ObjectType
-
-
-
-
-
-
-
-
-
-
 
 
 class LIDAR(BaseLidar):
@@ -70,7 +60,7 @@ class LIDAR(BaseLidar):
             self.n_theta_points, self.n_phi_points, self.n_channels
         )
 
-        self.buffer_manager = LiDARBufferManager()
+        self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=1)
         self.parent_inertia: Dict = {}
 
         self.DISTANCE_CHANNEL_IDX: int = Channels.DISTANCE_CHANNEL.value
@@ -79,10 +69,7 @@ class LIDAR(BaseLidar):
         self.threshold: float = 1
 
     def _get_flag(self, entity_type: EntityType) -> float:
-        object_type_length = len(EntityType)
-        # Normalize the enum value to a fraction of its length
-        flag_value = entity_type.value / object_type_length
-        return flag_value
+        return entity_type.value / len(EntityType)
 
     def _get_ObjectType_from_flag(self, flag: float) -> EntityType:
         object_type_length = len(EntityType) + 1
@@ -224,7 +211,9 @@ class LIDAR(BaseLidar):
 
     @property
     def buffer(self):
-        return self.buffer_manager.buffer.copy()
+        raise ValueError("LIDAR, BUFFER PROPERTY NOT IMPLEMENTED")
+        # BUFFER MANAGER CHANGED.
+        #return self.buffer_manager.buffer.copy()
 
     # ============================================================================================================
     # Sensor Functions
@@ -247,57 +236,42 @@ class LIDAR(BaseLidar):
         it receives the inertial data from the publisher and stores it in the buffer
         the publisher is triggered when imu sensor is updated, in the quacopter class
         """
-
+        topic: TopicsEnum = TopicsEnum.INERTIAL_DATA_BROADCAST
         # print("buffer_inertial_data", message, publisher_id)
         if "termination" in message:
-            self.buffer_manager.clear_buffer_data(publisher_id)
+            self.buffer_manager.close_buffer(publisher_id, topic)
 
         elif publisher_id == self.parent_id:
             self.parent_inertia = message
         else:
             # print("buffer_inertial_data", message, publisher_id)
-            self.buffer_manager.buffer_message(message, publisher_id)
-
-    def calculate_extremity_points(self, position, dimensions):
-        half_dimensions = np.array(dimensions) / 2
-        return {
-            "top": position + [0, 0, half_dimensions[2]],
-            "bottom": position - [0, 0, half_dimensions[2]],
-            "left": position - [half_dimensions[0], 0, 0],
-            "right": position + [half_dimensions[0], 0, 0],
-            "front": position + [0, half_dimensions[1], 0],
-            "back": position - [0, half_dimensions[1], 0],
-        }
+            self.buffer_manager.buffer_message(
+                message, publisher_id, topic, self.buffer_manager.current_step
+            )
 
     def process_message(self, message):
         """
         This function is called by the sensor manager
         it fetch tha data from the buffer
         """
-        position = message.get("position")
-        dimensions = message.get("dimensions")
-
-        if dimensions is None:
-            return position, None
-
-        # print(dimensions)
-        extremity_points = self.calculate_extremity_points(position, dimensions)
-        return position, extremity_points
+        return message.get("position")
 
     def update_data(self) -> None:
-        buffer_data = self.buffer_manager.get_all_data()
+        buffer_data = self.buffer_manager.get_latest_from_topic(TopicsEnum.INERTIAL_DATA_BROADCAST)
         self.reset()
 
         for target_id, message in buffer_data.items():
             publisher_type = message.get("publisher_type")
             if publisher_type is None:
-                continue  # ignora mensagens malformadas ou incompletas
+                continue  # ignore misformed or incomplete messages
 
-            position, extremity_points = self.process_message(message)
+            position = self.process_message(message)  # extremity_points not working yet
 
             self._add_end_position_for_entity(
                 position, publisher_type, target_id
             )
+
+        return None
 
 
     def read_data(self) -> Dict:
