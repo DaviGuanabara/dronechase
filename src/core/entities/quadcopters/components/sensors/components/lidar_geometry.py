@@ -71,8 +71,17 @@ def count_points(radius: float, resolution: float,
     return n_theta, n_phi
 
 
-def reframe(cartesian: np.ndarray, old_origin: np.ndarray, new_origin: np.ndarray)-> np.ndarray:
+import numpy as np
+import itertools
+from typing import Tuple, List
+
+# ----------------------------
+# Reframing
+# ----------------------------
+
+def reframe(cartesian: np.ndarray, old_origin: np.ndarray, new_origin: np.ndarray) -> np.ndarray:
     return cartesian + old_origin - new_origin
+
 
 # ----------------------------
 # Extraction
@@ -108,6 +117,7 @@ def cartesian_to_spherical(cartesian: np.ndarray) -> np.ndarray:
     phi = np.arctan2(y, x)
     return np.array([r, theta, phi])
 
+
 # ----------------------------
 # Angular Indexing
 # ----------------------------
@@ -118,47 +128,131 @@ def angle_idx(angle: float, angle_range: Tuple[float, float], n_points: int) -> 
 def get_angle_from_idx(idx: int, n_points: int, angle_range: Tuple[float, float]) -> float:
     return (idx / n_points) * (angle_range[1] - angle_range[0]) + angle_range[0]
 
-def gen_expanded_sphere(sphere_agent: np.ndarray):
-    "expand to add time layer"
-    expanded_sphere
+
+# ----------------------------
+# Sphere Expansion
+# ----------------------------
+
+def gen_expanded_sphere(sphere_agent: np.ndarray) -> np.ndarray:
+    # Adds a 3rd dimension for time
+    n_channels, n_theta, n_phi = sphere_agent.shape
+    expanded = np.zeros((n_channels + 1, n_theta, n_phi), dtype=np.float32)
+    expanded[:n_channels] = sphere_agent
+    return expanded
+
+
+# ----------------------------
+# Feature Transformation
+# ----------------------------
+
+def transform_features(features_extracted, neighbour_position, agent_position, n_theta_points, n_phi_points, angle_range_theta, angle_range_phi):
+
+    transformed_features = []
+    for feature in features_extracted:
+        norm_dist, entity_type, theta_idx, phi_idx = feature
+        theta = get_angle_from_idx(theta_idx, n_theta_points, angle_range_theta)
+        phi = get_angle_from_idx(phi_idx, n_phi_points, angle_range_phi)
+
+        # Convert to cartesian (local to neighbour)
+        cartesian = spherical_to_cartesian(np.array((norm_dist, theta, phi)))
+
+        # Reframe to agent
+        cartesian_reframed = reframe(cartesian, neighbour_position, agent_position)
+
+        # Convert back to spherical
+        polar_agent = cartesian_to_spherical(cartesian_reframed)
+
+        transformed_features.append((polar_agent[0], polar_agent[1], polar_agent[2], entity_type))
+
+    return transformed_features
+
+
+# ----------------------------
+# Add to Sphere
+# ----------------------------
+
+def add_feature(
+    sphere_agent: np.ndarray,
+    transformed_features: List[Tuple[float, float, float, float]],
+    delta_step: int,
+    angle_range_theta: Tuple[float, float],
+    angle_range_phi: Tuple[float, float],
+    n_points_theta: int,
+    n_points_phi: int,
+    distance_channel: int,
+    flag_channel: int,
+    time_channel: int
+) -> np.ndarray:
+
+    expanded_sphere = gen_expanded_sphere(sphere_agent)
+
+    for r, theta, phi, entity_type in transformed_features:
+        theta_idx = angle_idx(theta, angle_range_theta, n_points_theta)
+        phi_idx = angle_idx(phi, angle_range_phi, n_points_phi)
+
+        current_flag = expanded_sphere[flag_channel][theta_idx][phi_idx]
+        current_time = expanded_sphere[time_channel][theta_idx][phi_idx]
+
+        # Priority rule: prefer entity presence even if delta_step is older
+        if current_flag == 0 or current_time > delta_step:
+            expanded_sphere[flag_channel][theta_idx][phi_idx] = entity_type
+            expanded_sphere[distance_channel][theta_idx][phi_idx] = r
+            expanded_sphere[time_channel][theta_idx][phi_idx] = delta_step
+
     return expanded_sphere
+
 
 # ----------------------------
 # Main Pipeline Function
 # ----------------------------
 
-def add_feature(sphere_agent, transformed_features, delta_step, angle_range_theta, angle_range_phi, n_points_theta, n_points_phi, distance_channel, flag_channel, time_channel):
+def final_pipeline_for_each_neighbor(
+    sphere_neighbour: np.ndarray,
+    n_theta_points: int,
+    n_phi_points: int,
+    distance_channel: int,
+    flag_channel: int,
+    time_channel: int,
+    neighbour_position: np.ndarray,
+    agent_position: np.ndarray,
+    sphere_agent: np.ndarray,
+    current_step: int,
+    neighbour_step: int,
+    angle_range_theta: Tuple[float, float],
+    angle_range_phi: Tuple[float, float],
+) -> np.ndarray:
 
-    expanded_sphere = gen_expanded_sphere(sphere_agent)
-    
-
-    for feature in transformed_features:
-        r, theta, phi, entity_type = feature[0], feature[1], feature[2], feature[3]
-
-        theta_idx = angle_idx(theta, angle_range_theta, n_points_theta)
-        phi_idx = angle_idx(phi, angle_range_phi, n_points_phi)
-
-        if expanded_sphere[theta_idx][phi_idx][flag_channel] == 0:
-            expanded_sphere[theta_idx][phi_idx][flag_channel] = entity_type
-            expanded_sphere[theta_idx][phi_idx][distance_channel] = r
-            expanded_sphere[theta_idx][phi_idx][time_channel] = delta_step
-        
-
-def transform_features(features_extracted, neighbour_position, agent_position):
-
-    transformed_features = []
-    for feature in features_extracted:
-        norm_dist, entity_type, theta_idx, phi_idx = feature
-        cartesian = spherical_to_cartesian(np.array((norm_dist, theta_idx, phi_idx)))
-        cartesian_reframed = reframe(cartesian, neighbour_position, agent_position)
-        polar_agent = cartesian_to_spherical(cartesian_reframed)
-        transformed_features.append((polar_agent + [entity_type]))
-
-    return transformed_features
-
-def final_pipeline_for_each_neighbor(sphere_neighbour: np.ndarray, n_theta_points, n_phi_points, distance_channel, flag_channel, neighbour_position, agent_position, sphere_agent: np.ndarray, current_step, neighbour_step):
-
-    features_extracted = extract_lidar_features(sphere_neighbour, n_theta_points, n_phi_points, distance_channel, flag_channel)
-    transformed_features = transform_features(features_extracted, neighbour_position, agent_position)
     delta_step = current_step - neighbour_step
-    return add_feature(sphere_agent, transformed_features, delta_step)
+
+    features_extracted = extract_lidar_features(
+        sphere_neighbour,
+        n_theta_points,
+        n_phi_points,
+        distance_channel,
+        flag_channel
+    )
+
+    transformed_features = transform_features(
+        features_extracted,
+        neighbour_position,
+        agent_position,
+        n_theta_points,
+        n_phi_points,
+        angle_range_theta,
+        angle_range_phi
+    )
+
+    #time_channel = sphere_agent.shape[0]  # Assume next available channel
+
+    return add_feature(
+        sphere_agent,
+        transformed_features,
+        delta_step,
+        angle_range_theta,
+        angle_range_phi,
+        n_theta_points,
+        n_phi_points,
+        distance_channel,
+        flag_channel,
+        time_channel
+    )
