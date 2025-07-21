@@ -49,7 +49,10 @@ class LiDARBufferManager:
         delta_step = self.current_step - step
         if delta_step >= self.max_buffer_size:
             return  #avoid overflow
-        self.buffer[publisher_id][topic][delta_step] = message
+        
+        if self.buffer[publisher_id][topic][delta_step] is None:
+            self.buffer[publisher_id][topic][delta_step] = message
+
 
     def buffer_message(self, message: Dict, publisher_id: int, topic: TopicsEnum, step: int = -1) -> None:
         self._add_topic(publisher_id, topic)
@@ -127,9 +130,9 @@ class LiDARBufferManager:
             delta_step = random.choice(candidate_indices)
             absolute_step = self.current_step - delta_step
 
-            sample = {"absolute_step": absolute_step}
+            sample = {"step": absolute_step}
             for topic, messages in topic_buffers.items():
-                sample[topic] = messages[delta_step]
+                sample[topic.name] = messages[delta_step]
 
             samples.append(sample)
 

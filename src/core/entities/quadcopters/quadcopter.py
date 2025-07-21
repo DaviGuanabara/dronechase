@@ -545,6 +545,7 @@ class Quadcopter:
         """
 
         if isinstance(self.lidar, FusedLiDAR):
+            #TODO: IN MAINTANANCE
             self.lidar.enable_fusion()
 
         self._is_agent = True

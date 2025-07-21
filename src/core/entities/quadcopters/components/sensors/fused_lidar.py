@@ -173,6 +173,59 @@ class FusedLiDAR(LIDAR):
         # step, imu, lidar
         neighbours = [parent] + neighbours
         return neighbours
+    
+    def bootstrap_deltas(self, n_min:int, n_max: int):
+        """
+        LIDAR:
+        {"lidar": self.sphere}
+
+        IMU:
+        {
+            "position": position,
+            "attitude": attitude,
+            "quaternion": quaternion,
+            "velocity": velocity,
+            "angular_rate": angular_rate,
+        }
+
+        self.position: np.ndarray = np.zeros(3)
+        self.quaternions: np.ndarray = np.zeros(4)
+        self.attitude: np.ndarray = np.zeros(3)
+
+        self.velocity: np.ndarray = np.zeros(3)
+        self.angular_rate: np.ndarray = np.zeros(3)
+
+        def update_data(self):
+        POSITION = 3
+        EULER = 1
+        VELOCITY = 2
+        ANGULAR_RATE = 0
+        
+        self.quadx.update_state()
+        state = self.quadx.state
+
+        self.position = np.array(state[POSITION])
+        self.attitude = np.array(state[EULER])
+        self.quaternions = np.array(p.getQuaternionFromEuler(state[EULER]))
+        
+        self.velocity = np.array(state[VELOCITY])
+        self.angular_rate = np.array(state[ANGULAR_RATE])
+
+
+        I am going to use only velocity and position from IMU to generate the deltas.
+        """
+
+        neighbours = self.bootstrap(n_min, n_max)
+
+        for neighbour in neighbours:
+            IMU = TopicsEnum.INERTIAL_DATA_BROADCAST.name
+            LIDAR = TopicsEnum.LIDAR_DATA_BROADCAST.name
+            STEP = "step"
+
+            neighbour[IMU]
+
+
+
 
     def read_data(self) -> Dict:
         return {"fused_lidar": self.get_sphere()}
