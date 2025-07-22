@@ -1,7 +1,7 @@
 import itertools
 import math
 import numpy as np
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 from typing import List, Tuple
@@ -136,10 +136,15 @@ def get_angle_from_idx(idx: int, n_points: int, angle_range: Tuple[float, float]
 def gen_expanded_sphere(sphere_agent: np.ndarray) -> np.ndarray:
     # Adds a 3rd dimension for time
     n_channels, n_theta, n_phi = sphere_agent.shape
-    expanded = np.zeros((n_channels + 1, n_theta, n_phi), dtype=np.float32)
+    expanded = np.ones((n_channels + 1, n_theta, n_phi), dtype=np.float32)
     expanded[:n_channels] = sphere_agent
     return expanded
 
+
+def expand_and_mark_time(sphere: np.ndarray, time_channel: int, agent_step: int) -> np.ndarray:
+    expanded = gen_expanded_sphere(sphere)
+    expanded[time_channel] = agent_step
+    return expanded
 
 # ----------------------------
 # Feature Transformation
@@ -171,8 +176,13 @@ def transform_features(features_extracted, neighbour_position, agent_position, n
 # Add to Sphere
 # ----------------------------
 
-def add_feature(
-    sphere_agent: np.ndarray,
+#TODO: CODE COPIED FROM LIDAR.PY, REFACTOR TO A COMMON MODULE
+def gen_sphere(
+    n_theta_points, n_phi_points, n_channels: int = 2
+) -> np.ndarray:
+    return np.ones((n_channels, n_theta_points, n_phi_points), dtype=np.float32)
+
+def create_sphere(
     transformed_features: List[Tuple[float, float, float, float]],
     delta_step: int,
     angle_range_theta: Tuple[float, float],
@@ -183,30 +193,34 @@ def add_feature(
     flag_channel: int,
     time_channel: int
 ) -> np.ndarray:
+    
+    NO_ENTITY = 0
+    new_sphere = gen_sphere(n_points_theta, n_points_phi, n_channels=3)  # Ensure sphere has 3 channels
 
-    expanded_sphere = gen_expanded_sphere(sphere_agent)
+    
 
     for r, theta, phi, entity_type in transformed_features:
         theta_idx = angle_idx(theta, angle_range_theta, n_points_theta)
         phi_idx = angle_idx(phi, angle_range_phi, n_points_phi)
 
-        current_flag = expanded_sphere[flag_channel][theta_idx][phi_idx]
-        current_time = expanded_sphere[time_channel][theta_idx][phi_idx]
+        current_flag = new_sphere[flag_channel][theta_idx][phi_idx]
+        current_time = new_sphere[time_channel][theta_idx][phi_idx]
 
         # Priority rule: prefer entity presence even if delta_step is older
-        if current_flag == 0 or current_time > delta_step:
-            expanded_sphere[flag_channel][theta_idx][phi_idx] = entity_type
-            expanded_sphere[distance_channel][theta_idx][phi_idx] = r
-            expanded_sphere[time_channel][theta_idx][phi_idx] = delta_step
+        if current_flag == NO_ENTITY or current_time > delta_step:
+            new_sphere[distance_channel][theta_idx][phi_idx] = r
+            new_sphere[time_channel][theta_idx][phi_idx] = delta_step
+            new_sphere[flag_channel][theta_idx][phi_idx] = entity_type
+            
 
-    return expanded_sphere
+    return new_sphere
 
 
 # ----------------------------
 # Main Pipeline Function
 # ----------------------------
 
-def final_pipeline_for_each_neighbor(
+def neighbour_sphere_from_new_frame(
     sphere_neighbour: np.ndarray,
     n_theta_points: int,
     n_phi_points: int,
@@ -215,7 +229,6 @@ def final_pipeline_for_each_neighbor(
     time_channel: int,
     neighbour_position: np.ndarray,
     agent_position: np.ndarray,
-    sphere_agent: np.ndarray,
     current_step: int,
     neighbour_step: int,
     angle_range_theta: Tuple[float, float],
@@ -244,8 +257,7 @@ def final_pipeline_for_each_neighbor(
 
     #time_channel = sphere_agent.shape[0]  # Assume next available channel
 
-    return add_feature(
-        sphere_agent,
+    return create_sphere(
         transformed_features,
         delta_step,
         angle_range_theta,
@@ -256,3 +268,72 @@ def final_pipeline_for_each_neighbor(
         flag_channel,
         time_channel
     )
+
+def normalize_sphere(
+    sphere: np.ndarray,
+    distance_channel: int,
+    time_channel: int,
+    MAX_TEMPORAL_OFFSET: int = 10,
+    MAX_RADIUS: int = 100
+) -> np.ndarray:
+    # Normalize the distance channel
+    sphere[distance_channel] = np.clip(
+        sphere[distance_channel] / MAX_RADIUS, 0.0, 1.0)
+
+    sphere[time_channel] = np.clip(sphere[time_channel] / MAX_TEMPORAL_OFFSET, 0.0, 1.0)
+    return sphere
+
+def final_pipeline(
+    neighbours: List[Dict],
+    neighbour_lidar_key: str,
+    neighbour_imu_key: str,
+    neighbour_step_key: str,
+   
+    n_theta_points: int,
+    n_phi_points: int,
+    distance_channel: int,
+    flag_channel: int,
+    time_channel: int,
+
+    agent_position: np.ndarray,
+    sphere_agent: np.ndarray,
+    agent_step: int,
+    current_step: int,
+    
+    angle_range_theta: Tuple[float, float],
+    angle_range_phi: Tuple[float, float],
+    MAX_TEMPORAL_OFFSET: int = 10,
+    MAX_RADIUS: int = 100
+) -> np.ndarray:
+
+    neighbours_spheres = []
+    for neighbour in neighbours:
+        neighbour_imu = neighbour[neighbour_imu_key]
+        neighbour_lidar = neighbour[neighbour_lidar_key]
+        neighbour_step = neighbour[neighbour_step_key]
+
+
+
+        new_sphere = neighbour_sphere_from_new_frame(
+            neighbour_lidar,
+            n_theta_points,
+            n_phi_points,
+            distance_channel,
+            flag_channel,
+            time_channel,
+            neighbour_imu['position'],
+            agent_position,
+            current_step,
+            neighbour_step,
+            angle_range_theta,
+            angle_range_phi,
+            
+        )
+        new_sphere = normalize_sphere(
+            new_sphere, distance_channel, time_channel, MAX_TEMPORAL_OFFSET=MAX_TEMPORAL_OFFSET, MAX_RADIUS=MAX_RADIUS)
+        neighbours_spheres.append(new_sphere)
+
+    sphere_agent = expand_and_mark_time(
+        sphere_agent, time_channel, agent_step)
+    neighbours_spheres.append(sphere_agent)  # Include agent's own sphere
+    return np.stack(neighbours_spheres, axis=0)
