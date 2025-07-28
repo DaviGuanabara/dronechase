@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict
 from core.dataclasses.angle_grid import LIDARSpec
 from core.entities.quadcopters.components.sensors.interfaces.sensor_interface import Sensor
-from core.enums.channel_index import ChannelIndexConfig
+from core.enums.channel_index import LidarChannels
 from core.notification_system.topics_enum import TopicsEnum
 from enum import Enum, auto
 import numpy as np
@@ -25,9 +25,9 @@ class BaseLidar(Sensor):
 
         self.lidar_spec = LIDARSpec(theta_initial_radian=0, theta_final_radian=np.pi,
                                     phi_initial_radian=-np.pi, phi_final_radian=np.pi,
-                                    resolution=resolution, n_channels=len(ChannelIndexConfig), radius=radius)
+                                    resolution=resolution, n_channels=len(LidarChannels), max_radius=radius)
     
-        self.sphere: np.ndarray = self.lidar_spec.empty_sphere
+        self.sphere: np.ndarray = self.lidar_spec.empty_sphere()
         self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10)
         
     def buffer_lidar_data(self, message: Dict, publisher_id: int):

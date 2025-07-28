@@ -1,10 +1,13 @@
 
-from typing import Dict, List
+from typing import Dict, List, Optional
+from core.dataclasses.perception_snapshot import PerceptionSnapshot
+from core.entities.entity_type import EntityType
 from core.entities.quadcopters.components.sensors.lidar import LIDAR
 from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import TopicsEnum
-from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, CoordinateConverter
+from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, CoordinateConverter
 from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
+from core.entities.quadcopters.components.sensors.components.lidar_geometry import cartesian_to_spherical, neighbor_sphere_from_new_frame, normalize_spherical, reframe
 
 import numpy as np
 import random
@@ -43,7 +46,7 @@ class FusedLiDAR(BaseLidar):
 
     USO:
         lidar = FusedLiDAR(...)
-        lidar.enable_fusion()  # ativa a lógica de fusão
+        lidar.enable_fusion()  # ativa a lógica de fusão ?
 
         
     O lidar pega a posição de todos os drones. 
@@ -53,11 +56,6 @@ class FusedLiDAR(BaseLidar):
     Mas no meu caso, preciso também receber a leitura do LiDAR de todos os drones aliados.
 
     TODOs:
-    [ ] FAZER COISA 1: Implementar compensação por orientação relativa (ajuste rotacional entre drones)
-    [ ] FAZER COISA 2: Aplicar pesos baseados em distância e timestamp durante a fusão
-    [ ] FAZER COISA 3: Tornar o método de fusão pluggable (ex: média, max, atenção, aprendizado)
-    [ ] FAZER COISA 4: Adicionar controle de "decaimento" no buffer (ex: remova se passou muito tempo)
-    [ ] FAZER COISA 5: (Opcional) Armazenar logs de quais leituras foram usadas em cada passo
     """
 
     def __init__(
@@ -71,144 +69,104 @@ class FusedLiDAR(BaseLidar):
         debug: bool = False,
     ):
         super().__init__(parent_id, client_id, debug, radius, resolution, n_neighbors_min, n_neighbors_max)
-    
 
 
-    # ============================================================================================================================
-
-
-    def bootstrap(self):
+    def bootstrap(self) -> List[PerceptionSnapshot]:
 
         n = random.choice(range(self.n_neighbors_min, self.n_neighbors_max))
-        neighborhood = self.buffer_manager.get_neighborhood(n_neighbors=n, exclude_publisher_id=self.parent_id)
+        return self.buffer_manager.get_random_neighborhood(
+            n_neighbors=n, exclude_publisher_id=self.parent_id
+        )
 
+    def _update_sphere_stack(self):
+        agent = self.buffer_manager.get_latest_snapshot(self.parent_id)
 
+        if agent is None or agent.sphere is None:
+            return
 
+        neighborhood: List[PerceptionSnapshot] = self.bootstrap()
+        sphere_stack: List[np.ndarray] = [agent.sphere]
 
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def update_data(self):
-
-        """
-        It is like it is reading the environment.
-        it returns the resulting matrix of the lidar, to be broadcasted.
-        As it will be broadcasted, it will be saved in the buffer, through 'buffer_lidar_data'.
-        """
-        buffer_data = self.buffer_manager.get_latest_from_topic(
-            TopicsEnum.INERTIAL_DATA_BROADCAST)
-        self.reset()
-
-        for target_id, message in buffer_data.items():
-            publisher_type = message.get("publisher_type")
-            if publisher_type is None:
-                continue  # ignore misformed or incomplete messages
-
-            # extremity_points not working yet
-            position = message.get("position")
-
-            self._add_end_position_for_entity(
-                position, publisher_type, target_id
+        for neighbor in neighborhood:
+            neighbor_sphere_reframed = neighbor_sphere_from_new_frame(
+                neighbor=neighbor,
+                agent=agent,
+                lidar_spec=self.lidar_spec
             )
-        # Return the current state of the sphere
-        return self.sphere
-    
-    
+            if neighbor_sphere_reframed is not None:
+                sphere_stack.append(neighbor_sphere_reframed)
 
-    
-    def bootstrap_deltas(self, n_min:int, n_max: int):
+        self.sphere_stack = sphere_stack
+
+    def get_snapshots_by_distance(self) -> List[PerceptionSnapshot]:
         """
-        LIDAR:
-        {"lidar": self.sphere}
+        Return threats (LOITERINGMUNITION) within the max LiDAR radius.
+        """
+        latests = self.buffer_manager.get_latests(self.parent_id)
+        max_radius: float = self.lidar_spec.max_radius
 
-        IMU:
-        {
-            "position": position,
-            "attitude": attitude,
-            "quaternion": quaternion,
-            "velocity": velocity,
-            "angular_rate": angular_rate,
-        }
+        agent_snapshot = self.get_agent()
+        if not agent_snapshot or agent_snapshot.position is None:
+            return []
 
-        self.position: np.ndarray = np.zeros(3)
-        self.quaternions: np.ndarray = np.zeros(4)
-        self.attitude: np.ndarray = np.zeros(3)
+        agent_pos = agent_snapshot.position
 
-        self.velocity: np.ndarray = np.zeros(3)
-        self.angular_rate: np.ndarray = np.zeros(3)
+        return [
+            latest for latest in latests
+            if latest.position is not None and np.linalg.norm(latest.position - agent_pos) <= max_radius
+        ]
 
-        def update_data(self):
-        POSITION = 3
-        EULER = 1
-        VELOCITY = 2
-        ANGULAR_RATE = 0
+    def get_agent(self) -> Optional[PerceptionSnapshot]:
+        return self.buffer_manager.get_latest_snapshot(self.parent_id)
+    
+    def add_features(self, sphere, features):
+        """
         
-        self.quadx.update_state()
-        state = self.quadx.state
-
-        self.position = np.array(state[POSITION])
-        self.attitude = np.array(state[EULER])
-        self.quaternions = np.array(p.getQuaternionFromEuler(state[EULER]))
-        
-        self.velocity = np.array(state[VELOCITY])
-        self.angular_rate = np.array(state[ANGULAR_RATE])
-
-
-        I am going to use only velocity and position from IMU to generate the deltas.
+        r, theta, phi, entity type, delta_step = features
         """
 
-        neighbours = self.bootstrap(n_min, n_max)
+        for feature in features:
+            r = feature[0]
+            theta = feature[1]
+            phi = feature[2]
+            entity_type = feature[3]
+            delta_step = feature[4]
 
-        for neighbour in neighbours:
-            IMU = TopicsEnum.INERTIAL_DATA_BROADCAST.name
-            LIDAR = TopicsEnum.LIDAR_DATA_BROADCAST.name
-            STEP = "step"
+            sphere[LidarChannels.distance][theta][phi] = r
+            sphere[LidarChannels.flag][theta][phi] = entity_type
+            sphere[LidarChannels.time][theta][phi] = delta_step
 
-            neighbour[IMU]
+        return sphere
 
+
+    
+    def _update_own_sphere(self):
+        # retrieve last positions and entity types from all publishers, excluding agent
+        
+        snapshots = self.get_snapshots_by_distance()
+        agent = self.get_agent()
+
+        if not agent or not agent.position:
+            return
+
+        features = []
+        for snapshot in snapshots:
+            if not snapshot.position:
+                continue
+            # reframe
+            reframed_snapshot_position = reframe(snapshot.position, np.zeros(3), agent.position)
+            spherical = cartesian_to_spherical(reframed_snapshot_position)
+            spherical = normalize_spherical(spherical, lidar_spec=self.lidar_spec)
+            # the lidars data are always
+            # from the loyal wingman.
+           
+            delta_step = 0 #current delta step
+            features.append((*spherical, EntityType.LOYALWINGMAN, delta_step)) # mount features
+        
+        new_sphere = self.lidar_spec.empty_sphere()
+        self.sphere = self.add_features(new_sphere, features)
 
 
 
     def read_data(self) -> Dict:
-        return {"fused_lidar": self.get_sphere()}
+        return {"lidar": self.sphere, "fused_lidar": self.sphere_stack}

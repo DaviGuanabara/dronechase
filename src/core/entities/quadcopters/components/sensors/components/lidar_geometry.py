@@ -1,7 +1,7 @@
 import itertools
 import math
 import numpy as np
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from typing import List, Tuple
@@ -12,6 +12,7 @@ import itertools
 from typing import Tuple, List
 
 from core.dataclasses.angle_grid import LIDARSpec
+from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.enums.channel_index import LidarChannels
 from core.dataclasses.perception_keys import PerceptionKeys
 
@@ -41,25 +42,25 @@ def normalize_angle(angle: float, initial: float, final: float, n_points: int) -
     return round((angle - initial) / (final - initial) * n_points) % n_points
 
 
-def normalize_theta(theta: float, n_theta_points: int, theta_range: Tuple[float, float]) -> int:
-    return normalize_angle(theta, theta_range[0], theta_range[1], n_theta_points)
+def normalize_theta(theta: float, n_theta_points: int, theta_min:float, theta_max:float) -> int:
+    return normalize_angle(theta, theta_min, theta_max, n_theta_points)
 
 
-def normalize_phi(phi: float, n_phi_points: int, phi_range: Tuple[float, float]) -> int:
-    return normalize_angle(phi, phi_range[0], phi_range[1], n_phi_points)
+def normalize_phi(phi: float, n_phi_points: int, phi_min:float, phi_max:float) -> int:
+    return normalize_angle(phi, phi_min, phi_max, n_phi_points)
 
 
 def normalize_distance(distance: float, radius: float) -> float:
     return distance / radius
 
 
-def normalize_spherical(spherical: np.ndarray, radius: float, n_theta: int, n_phi: int,
-                        theta_range: Tuple[float, float], phi_range: Tuple[float, float]) -> Tuple[float, int, int]:
+def normalize_spherical(spherical: np.ndarray, lidar_spec:LIDARSpec) -> Tuple[float, int, int]:
     """Converte coordenada esférica contínua em valores normalizados e discretizados."""
+
     distance, theta, phi = spherical
-    norm_distance = normalize_distance(distance, radius)
-    theta_point = normalize_theta(theta, n_theta, theta_range)
-    phi_point = normalize_phi(phi, n_phi, phi_range)
+    norm_distance = normalize_distance(distance, lidar_spec.max_radius)
+    theta_point = normalize_theta(theta, n_theta_points=lidar_spec.n_theta_points, theta_min=lidar_spec.theta_initial_radian, theta_max=lidar_spec.theta_final_radian)
+    phi_point = normalize_phi(phi, n_phi_points=lidar_spec.n_phi_points, phi_min=lidar_spec.phi_initial_radian, phi_max=lidar_spec.phi_final_radian)
     return norm_distance, theta_point, phi_point
 
 
@@ -67,8 +68,8 @@ def normalize_spherical(spherical: np.ndarray, radius: float, n_theta: int, n_ph
 # Reframing
 # ----------------------------
 
-def reframe(cartesian: np.ndarray, old_origin: np.ndarray, new_origin: np.ndarray) -> np.ndarray:
-    return cartesian + old_origin - new_origin
+def reframe(cartesian: np.ndarray, frame: np.ndarray, new_frame: np.ndarray) -> np.ndarray:
+    return cartesian + frame - new_frame
 
 
 
@@ -113,7 +114,7 @@ def radian_from_index(index: int, n_points: int, min_angle: float, max_angle: fl
 # ----------------------------
 
 
-def extract_features(sphere: np.ndarray, lidar_spec: LIDARSpec) -> List[Tuple[float, float, int, int]]:
+def extract_features(sphere: np.ndarray, lidar_spec: LIDARSpec) -> np.ndarray:
 
     features = []
     for theta_idx, phi_idx in itertools.product(range(lidar_spec.n_theta_points), range(lidar_spec.n_phi_points)):
@@ -122,8 +123,9 @@ def extract_features(sphere: np.ndarray, lidar_spec: LIDARSpec) -> List[Tuple[fl
         if norm_dist < 1:
             theta = radian_from_index(theta_idx, lidar_spec.n_theta_points, lidar_spec.theta_initial_radian, lidar_spec.theta_final_radian)
             phi = radian_from_index(phi_idx, lidar_spec.n_phi_points, lidar_spec.phi_initial_radian, lidar_spec.phi_final_radian)
-            features.append((norm_dist, entity_type, theta, phi))
-    return features
+            features.append([norm_dist, theta, phi, entity_type])
+            #features.append((norm_dist, theta, phi, entity_type))
+    return np.array(features)
 
 
 # ----------------------------
@@ -134,21 +136,22 @@ def transform_features(neighbour_features, neighbour_position, agent_position) -
 
     transformed_features = []
     for feature in neighbour_features:
-        norm_dist, entity_type, theta, phi = feature
+        #r, theta, phi, entity_type = feature
+        #spherical = feature[:3] #np.array((r, theta, phi))
+        entity_type = feature[3]
+        # Convert to cartesian (spherical to cartesian)
+        cartesian = spherical_to_cartesian(spherical=feature[:3])
 
-        # Convert to cartesian (local to neighbour)
-        cartesian = spherical_to_cartesian(np.array((norm_dist, theta, phi)))
-
-        # Reframe to agent
+        # Reframe neighbor to agent
         cartesian_reframed = reframe(
             cartesian, neighbour_position, agent_position)
 
         # Convert back to spherical
-        polar_agent = cartesian_to_spherical(cartesian_reframed)
-
-        transformed_features.append(
-            (polar_agent[0], polar_agent[1], polar_agent[2], entity_type))
-
+        spherical_agent: np.ndarray = cartesian_to_spherical(cartesian_reframed) #r, theta, phi
+       
+        #transformed_features.append(
+        #    (spherical_agent[0], spherical_agent[1], spherical_agent[2], entity_type))
+        transformed_features.append([*spherical_agent, entity_type])
     return transformed_features
 
 
@@ -190,33 +193,36 @@ def create_sphere(
 # ----------------------------
 
 def neighbor_sphere_from_new_frame(
-    neighbor_sphere: np.ndarray,
-    neighbor_position: np.ndarray,
-    neighbor_step: int,
-    agent_position: np.ndarray,
-    current_step: int,
-
+    neighbor: PerceptionSnapshot,
+    agent: PerceptionSnapshot,
     lidar_spec: LIDARSpec,
     
-) -> np.ndarray:
+) -> Optional[np.ndarray]:
 
-    delta_step = current_step - neighbor_step
-
+    if not neighbor.sphere or not neighbor.position: 
+        return None
+    
+    if not agent.position: 
+        return None
     #OK - EXTRACT LIDAR FEATURES
+    #sphere: np.ndarray
+    
     features_extracted = extract_features(
-        neighbor_sphere,
+        sphere=neighbor.sphere,
+        #neighbor_sphere,
         lidar_spec=lidar_spec
     )
 
-    #transform features to agent's frame
+    #Ok - transform features to agent's frame
     transformed_features = transform_features(
         features_extracted,
-        neighbor_position,
-        agent_position,
+        neighbor.position,
+        agent.position,
     )
 
+    delta_step = agent.step - neighbor.step
     #time_channel = sphere_agent.shape[0]  # Assume next available channel
-
+    #OK
     return create_sphere(
         transformed_features,
         delta_step,

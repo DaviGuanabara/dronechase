@@ -240,6 +240,7 @@ class Quadcopter:
         inertial_data = self.flight_state_manager.get_inertial_data()
         inertial_data["dimensions"] = self.dimensions
 
+        #TODO: ALL PUBLISHING MUST HAVE PUBLISHER TYPE
         message = {**inertial_data, "publisher_type": self.quadcopter_type}
         # print(message)
         # print("Publishing intertial data")
