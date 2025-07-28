@@ -3,14 +3,20 @@ from typing import Dict, List
 from core.entities.quadcopters.components.sensors.lidar import LIDAR
 from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import TopicsEnum
-from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, LiDARBufferManager, CoordinateConverter
+from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, CoordinateConverter
+from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
 
 import numpy as np
 import random
 import time
 
+from core.dataclasses.normalization import NormalizationConfig
+from core.dataclasses.angle_grid import LIDARSpec
+from core.enums.channel_index import LidarChannels
+from core.dataclasses.perception_keys import PerceptionKeys
 
-class FusedLiDAR(LIDAR):
+
+class FusedLiDAR(BaseLidar):
     """
     FusedLiDAR estende a classe LiDAR para permitir a fusão de dados de sensores 
     de múltiplos drones aliados, com objetivo de fornecer observações mais ricas 
@@ -60,77 +66,68 @@ class FusedLiDAR(LIDAR):
         client_id: int,
         radius: float = 20,
         resolution: float = 8,
+        n_neighbors_min: int = 1,
+        n_neighbors_max: int = 5,
         debug: bool = False,
     ):
-        self.parent_id = parent_id
-        self.client_id = client_id
-        self.debug = debug
-        self.debug_line_id = -1
-        self.debug_lines_id = []
-
-        self.n_channels: int = len(Channels)
-
-        self.flag_size = 3
-
-        self.radius = radius
-        self.resolution = resolution
-
-        self.THETA_INITIAL_RADIAN = 0
-        self.THETA_FINAL_RADIAN = np.pi
-        self.THETA_SIZE = self.THETA_FINAL_RADIAN - self.THETA_INITIAL_RADIAN
-
-        self.PHI_INITIAL_RADIAN = -np.pi
-        self.PHI_FINAL_RADIAN = np.pi
-        self.PHI_SIZE = self.PHI_FINAL_RADIAN - self.PHI_INITIAL_RADIAN
-
-        self.n_theta_points, self.n_phi_points = self._count_points(
-            radius, resolution)
-        self.sphere: np.ndarray = self._gen_sphere(
-            self.n_theta_points, self.n_phi_points, self.n_channels
-        )
-
-        self.buffer_manager = LiDARBufferManager(
-            current_step=0, max_buffer_size=10)
-        self.parent_inertia: Dict = {}
-
-        self.DISTANCE_CHANNEL_IDX: int = Channels.DISTANCE_CHANNEL.value
-        self.FLAG_CHANNEL_IDX: int = Channels.FLAG_CHANNEL.value
-
-        self.threshold: float = 1
-
-
+        super().__init__(parent_id, client_id, debug, radius, resolution, n_neighbors_min, n_neighbors_max)
+    
 
 
     # ============================================================================================================================
-    # Buffer Management
-    # the step associated with the message is considered the current step
-    # TODO: Message delivered with a step.
-    # ============================================================================================================================
 
-    def buffer_lidar_data(self, message: Dict, publisher_id: int):
-        topic: TopicsEnum = TopicsEnum.LIDAR_DATA_BROADCAST
-        self._buffer_data(message, publisher_id, topic) 
 
-    def buffer_inertial_data(self, message: Dict, publisher_id: int):
-        topic: TopicsEnum = TopicsEnum.INERTIAL_DATA_BROADCAST
-        self._buffer_data(message, publisher_id, topic)
+    def bootstrap(self):
 
-    def buffer_step_broadcast(self, message: Dict, publisher_id: int):
-        topic: TopicsEnum = TopicsEnum.AGENT_STEP_BROADCAST
-        self._buffer_data(message, publisher_id, topic)
+        n = random.choice(range(self.n_neighbors_min, self.n_neighbors_max))
+        neighborhood = self.buffer_manager.get_neighborhood(n_neighbors=n, exclude_publisher_id=self.parent_id)
 
-    def _buffer_data(self, message: Dict, publisher_id: int, topic: TopicsEnum):
-        """
-        Método genérico para bufferizar dados de diferentes tópicos.
-        """
-        if "termination" in message:
-            self.buffer_manager.close_buffer(publisher_id, topic)
-        else:
-            self.buffer_manager.buffer_message(
-                message, publisher_id, topic, self.buffer_manager.current_step
-            )
 
-    # ============================================================================================================================
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def update_data(self):
 
@@ -149,7 +146,7 @@ class FusedLiDAR(LIDAR):
                 continue  # ignore misformed or incomplete messages
 
             # extremity_points not working yet
-            position = self.process_message(message)
+            position = message.get("position")
 
             self._add_end_position_for_entity(
                 position, publisher_type, target_id
@@ -157,22 +154,8 @@ class FusedLiDAR(LIDAR):
         # Return the current state of the sphere
         return self.sphere
     
-    def bootstrap(self, n_min:int, n_max: int) -> List[Dict]:
-        """
-        Bootstrap the LiDAR data from the message.
-        This method is called to initialize the LiDAR data with the given message.
-        """
-        
-        n_neighbours = random.randint(n_min, n_max-1) # to let space for the parent
-        parent = self.buffer_manager.get_latest_from_publisher(self.parent_id)
-        neighbours = self.buffer_manager.get_neighbours(
-            n_neighbours, self.parent_id
-        )
+    
 
-        #TODO: Format the data to the following structure:
-        # step, imu, lidar
-        neighbours = [parent] + neighbours
-        return neighbours
     
     def bootstrap_deltas(self, n_min:int, n_max: int):
         """

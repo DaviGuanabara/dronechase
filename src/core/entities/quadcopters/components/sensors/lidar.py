@@ -4,7 +4,9 @@ from typing import Tuple, List, Dict
 import pybullet as p # type: ignore
 from gymnasium import spaces
 
-from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, LiDARBufferManager, CoordinateConverter
+from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
+from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, CoordinateConverter
+
 from core.entities.entity_type import EntityType
 from core.notification_system.topics_enum import TopicsEnum
 # from ....entity_type import EntityType
@@ -246,7 +248,7 @@ class LIDAR(BaseLidar):
         else:
             # print("buffer_inertial_data", message, publisher_id)
             self.buffer_manager.buffer_message(
-                message, publisher_id, topic, self.buffer_manager.current_step
+                message=message, publisher_id=publisher_id, topic=topic, step=self.buffer_manager.current_step
             )
 
     def process_message(self, message):
@@ -257,19 +259,21 @@ class LIDAR(BaseLidar):
         return message.get("position")
 
     def update_data(self) -> None:
-        buffer_data = self.buffer_manager.get_latest_from_topic(TopicsEnum.INERTIAL_DATA_BROADCAST)
+        buffer_data = self.buffer_manager.get_latest_from_topic(
+            TopicsEnum.INERTIAL_DATA_BROADCAST)
         self.reset()
 
         for target_id, message in buffer_data.items():
             publisher_type = message.get("publisher_type")
             if publisher_type is None:
                 continue  # ignore misformed or incomplete messages
-
-            position = self.process_message(message)  # extremity_points not working yet
-
-            self._add_end_position_for_entity(
-                position, publisher_type, target_id
-            )
+            
+            position = message.get("position")
+            
+            if position is not None:
+                self._add_end_position_for_entity(
+                    position, publisher_type, target_id
+                )
 
         return None
 
