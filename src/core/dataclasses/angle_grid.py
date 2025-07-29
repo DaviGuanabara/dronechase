@@ -63,6 +63,22 @@ class LIDARSpec:
         stacked_sphere_shape = (1 + max_neighbors, *self.shape)
         mask_shape = (1 + max_neighbors,)
         return stacked_sphere_shape, mask_shape
+    
+    def get_stacked_lidar_shape(self, max_neighbors: int) -> Tuple[int, int, int, int]:
+        """
+        Returns the shape of the stacked LiDAR tensor:
+        (1 + max_neighbors, C, θ, φ)
+        """
+        return (1 + max_neighbors, *self.shape)
+
+
+    def get_validity_mask_shape(self, max_neighbors: int) -> Tuple[int]:
+        """
+        Returns the shape of the mask indicating valid spheres:
+        (1 + max_neighbors,)
+        """
+        return (1 + max_neighbors,)
+
 
 
 

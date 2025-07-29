@@ -1,4 +1,5 @@
 
+from typing import List, Tuple
 from typing import Dict, List, Optional, Tuple
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.entities.entity_type import EntityType
@@ -78,11 +79,18 @@ class FusedLIDAR(BaseLidar):
             n_neighbors=n, exclude_publisher_id=self.parent_id
         )
 
-    def _update_sphere_stack(self):
+    def _build_valid_spheres(self) -> List[np.ndarray]:
+        """
+        first is agent sphere, then neighbors spheres.
+        Returns a list of spheres, where the first element is the agent's sphere
+        shape is (N, C, θ, φ) where N = 1 + max_neighbors
+        and C, θ, φ are defined by the LIDARSpec.
+        """
+
         agent = self.buffer_manager.get_latest_snapshot(self.parent_id)
 
         if agent is None or agent.sphere is None:
-            return
+            return []
 
         neighborhood: List[PerceptionSnapshot] = self.bootstrap()
         sphere_stack: List[np.ndarray] = [agent.sphere]
@@ -150,10 +158,11 @@ class FusedLIDAR(BaseLidar):
 
 
     def read_data(self) -> Dict:
-        self.sphere_stack = self._update_sphere_stack()
+        self.sphere_stack = self._build_valid_spheres()
+        padded_stack, mask = self._pad_sphere_stack(self.sphere_stack)
         #TODO: I need to add mask on fused lidar
-        return {"lidar": self.sphere, "fused_lidar": self.sphere_stack}
-    
+        return {"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask}
+
     def reset(self):
         pass
 
@@ -163,40 +172,40 @@ class FusedLIDAR(BaseLidar):
         
         return the shape together with the mask
         """
+        #TODO: How to handle the mask?
+        # The shape is (N, C, θ, φ) where N = 1 + max_neighbors
+        # and C, θ, φ are defined by the LIDARSpec.
         return self.lidar_spec.stacked_output_shapes(self.n_neighbors_max)
-    
-    def _update_sphere_stack(self) -> Tuple[np.ndarray, np.ndarray]:
-        agent = self.buffer_manager.get_latest_snapshot(self.parent_id)
-        if agent is None or agent.sphere is None:
-            # Return zeros and mask of all False
-            empty_stack, empty_mask = self._empty_stack_and_mask()
-            return empty_stack, empty_mask
 
-        neighborhood: List[PerceptionSnapshot] = self.bootstrap()
-        sphere_stack: List[np.ndarray] = [agent.sphere]
-        mask: List[bool] = [True]
+    def _pad_sphere_stack(
+        self,
+        valid_spheres: List[np.ndarray],
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Pads a list of valid spheres up to self.n_neighbors_max and returns the stack with a validity mask.
 
-        for neighbor in neighborhood:
-            reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, agent=agent)
-            if reframed is not None:
-                sphere_stack.append(reframed)
-                mask.append(True)
+        Returns:
+            sphere_stack: np.ndarray of shape (max_neighbors, C, θ, φ)
+            validity_mask: np.ndarray of shape (max_neighbors,) with boolean values
+        """
+        
+        max_spheres = self.n_neighbors_max + 1
+        n_valid = len(valid_spheres)
 
-        # Pad with empty spheres if needed
-        max_total = 1 + self.n_neighbors_max
-        while len(sphere_stack) < max_total:
-            sphere_stack.append(self.lidar_spec.empty_sphere())
-            mask.append(False)
+        if n_valid > max_spheres:
+            raise ValueError(
+                f"Received {n_valid} spheres but max is {max_spheres}")
 
-        # Ensure shape is consistent (N, C, θ, φ)
-        stacked = np.stack(sphere_stack, axis=0)
-        mask_np = np.array(mask, dtype=bool)
+        # Create the full mask
+        validity_mask = np.zeros(max_spheres, dtype=bool)
+        validity_mask[:n_valid] = True
 
-        return stacked, mask_np
-    
-    def _empty_stack_and_mask(self) -> Tuple[np.ndarray, np.ndarray]:
-        empty = self.lidar_spec.empty_sphere()
-        stack = np.stack([empty] * (1 + self.n_neighbors_max), axis=0)
-        mask = np.zeros((1 + self.n_neighbors_max,), dtype=bool)
-        return stack, mask
+        # Pad with "invalid spheres"
+        invalid_sphere = self.lidar_spec.empty_sphere()  # assume all ones = no detection
+        padded_spheres = valid_spheres + \
+            [invalid_sphere.copy() for _ in range(max_spheres - n_valid)]
 
+        # Stack into single array (N, C, θ, φ)
+        sphere_stack_padded = np.stack(padded_spheres, axis=0)
+
+        return sphere_stack_padded, validity_mask
