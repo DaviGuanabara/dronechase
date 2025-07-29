@@ -4,6 +4,7 @@ from typing import Dict, Optional
 import numpy as np
 
 from core.entities.entity_type import EntityType
+from core.enums.channel_index import LidarChannels
 from core.notification_system.topics_enum import TopicsEnum
 
 
@@ -13,6 +14,12 @@ class PerceptionSnapshot():
     publisher_id: int
     step: int
     entity_type: EntityType
+    max_delta_step: int
+
+
+    def relative_step(self, current_absolute_step: int) -> float:
+        delta = (self.step - current_absolute_step) / self.max_delta_step
+        return np.clip(delta, 0.0, 1.0)
 
     @property
     def imu(self) -> Optional[Dict]:
@@ -26,6 +33,32 @@ class PerceptionSnapshot():
     def sphere(self) -> Optional[np.ndarray]:
         lidar = self.lidar
         return lidar.get("sphere") if lidar and "sphere" in lidar else None
+    
+    def build_temporal_sphere(self, current_absolute_step: int) -> Optional[np.ndarray]:
+        """
+        Returns a LiDAR sphere with an added time channel representing delta_step,
+        calculated as (current_step - self.step).
+        """
+        if self.sphere is None:
+            return None
+
+        TEMPORAL_N_CHANNELS = 3
+        sphere_raw = self.sphere
+        n_channels, n_theta, n_phi = sphere_raw.shape
+
+        if n_channels != 2:
+            raise ValueError(f"Expected 2 channels (distance, flag), got {n_channels}")
+
+        t_sphere = np.zeros((TEMPORAL_N_CHANNELS, n_theta, n_phi), dtype=sphere_raw.dtype)
+        t_sphere[LidarChannels.distance.value] = sphere_raw[LidarChannels.distance.value]
+        t_sphere[LidarChannels.flag.value] = sphere_raw[LidarChannels.flag.value]
+
+        delta_step = self.relative_step(current_absolute_step)
+        t_sphere[LidarChannels.time.value].fill(delta_step)
+
+        return t_sphere
+
+
     
     def update(self, topic: TopicsEnum, data: Dict) -> None:
         """

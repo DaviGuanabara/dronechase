@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Tuple
 from abc import ABC, abstractmethod
 from typing import Dict
 from core.dataclasses.angle_grid import LIDARSpec
+from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.entities.quadcopters.components.sensors.interfaces.sensor_interface import Sensor
 from core.enums.channel_index import LidarChannels
 from core.notification_system.topics_enum import TopicsEnum
@@ -11,6 +12,7 @@ import numpy as np
 import random
 from math import ceil
 from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
+from core.entities.quadcopters.components.sensors.components.lidar_math import LidarMath
 
 class BaseLidar(Sensor):
     
@@ -26,52 +28,43 @@ class BaseLidar(Sensor):
         self.lidar_spec = LIDARSpec(theta_initial_radian=0, theta_final_radian=np.pi,
                                     phi_initial_radian=-np.pi, phi_final_radian=np.pi,
                                     resolution=resolution, n_channels=len(LidarChannels), max_radius=radius)
+        
+        self.math = LidarMath(self.lidar_spec)
     
         self.sphere: np.ndarray = self.lidar_spec.empty_sphere()
         self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10)
         
     def buffer_lidar_data(self, message: Dict, publisher_id: int):
         topic: TopicsEnum = TopicsEnum.LIDAR_DATA_BROADCAST
-        self._buffer_data(message, publisher_id, topic)
+        self._buffer_data(message, publisher_id, topic, message.get("step", -1))
 
     def buffer_inertial_data(self, message: Dict, publisher_id: int):
         topic: TopicsEnum = TopicsEnum.INERTIAL_DATA_BROADCAST
-        self._buffer_data(message, publisher_id, topic)
+        self._buffer_data(message, publisher_id, topic, message.get("step", -1))
 
     def buffer_step_broadcast(self, message: Dict, publisher_id: int):
         self.buffer_manager.update_current_step(message.get("step", self.buffer_manager.current_step))
 
 
-    def _buffer_data(self, message: Dict, publisher_id: int, topic: TopicsEnum):
+    def _buffer_data(self, message: Dict, publisher_id: int, topic: TopicsEnum, step:int):
         """
         Método genérico para bufferizar dados de diferentes tópicos.
         """
         if "termination" in message:
             self.buffer_manager.close_buffer(publisher_id, topic)
         else:
-            self.buffer_manager.buffer_message(
-                message, publisher_id, topic, self.buffer_manager.current_step
-            )
+            self.buffer_manager.buffer_message(message, publisher_id, topic, step)
 
 
+    def _reset_sphere(self):
+        if self.sphere:
+            self.lidar_spec.reset_sphere(self.sphere)
 
 
+    def get_agent(self) -> Optional[PerceptionSnapshot]:
+        return self.buffer_manager.get_latest_snapshot(self.parent_id)
+    
+    @abstractmethod
+    def get_data_shape(self) -> Tuple:
+        pass
 
-
-
-class CoordinateConverter:
-    @staticmethod
-    def spherical_to_cartesian(spherical: np.ndarray) -> np.ndarray:
-        radius, theta, phi = spherical
-        x = radius * np.sin(theta) * np.cos(phi)
-        y = radius * np.sin(theta) * np.sin(phi)
-        z = radius * np.cos(theta)
-        return np.array([x, y, z])
-
-    @staticmethod
-    def cartesian_to_spherical(cartesian: np.ndarray) -> np.ndarray:
-        x, y, z = cartesian
-        radius = np.sqrt(x**2 + y**2 + z**2)
-        theta = np.arccos(z / radius)
-        phi = np.arctan2(y, x)
-        return np.array([radius, theta, phi])

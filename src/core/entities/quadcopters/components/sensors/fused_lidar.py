@@ -1,13 +1,13 @@
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.entities.entity_type import EntityType
 from core.entities.quadcopters.components.sensors.lidar import LIDAR
 from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import TopicsEnum
-from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, CoordinateConverter
+from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar
 from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
-from core.entities.quadcopters.components.sensors.components.lidar_geometry import cartesian_to_spherical, neighbor_sphere_from_new_frame, normalize_spherical, reframe
+
 
 import numpy as np
 import random
@@ -19,7 +19,7 @@ from core.enums.channel_index import LidarChannels
 from core.dataclasses.perception_keys import PerceptionKeys
 
 
-class FusedLiDAR(BaseLidar):
+class FusedLIDAR(BaseLidar):
     """
     FusedLiDAR estende a classe LiDAR para permitir a fusão de dados de sensores 
     de múltiplos drones aliados, com objetivo de fornecer observações mais ricas 
@@ -88,15 +88,12 @@ class FusedLiDAR(BaseLidar):
         sphere_stack: List[np.ndarray] = [agent.sphere]
 
         for neighbor in neighborhood:
-            neighbor_sphere_reframed = neighbor_sphere_from_new_frame(
-                neighbor=neighbor,
-                agent=agent,
-                lidar_spec=self.lidar_spec
-            )
+            neighbor_sphere_reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, agent=agent)
+
             if neighbor_sphere_reframed is not None:
                 sphere_stack.append(neighbor_sphere_reframed)
 
-        self.sphere_stack = sphere_stack
+        return sphere_stack
 
     def get_snapshots_by_distance(self) -> List[PerceptionSnapshot]:
         """
@@ -116,31 +113,13 @@ class FusedLiDAR(BaseLidar):
             if latest.position is not None and np.linalg.norm(latest.position - agent_pos) <= max_radius
         ]
 
-    def get_agent(self) -> Optional[PerceptionSnapshot]:
-        return self.buffer_manager.get_latest_snapshot(self.parent_id)
     
-    def add_features(self, sphere, features):
-        """
-        
-        r, theta, phi, entity type, delta_step = features
-        """
-
-        for feature in features:
-            r = feature[0]
-            theta = feature[1]
-            phi = feature[2]
-            entity_type = feature[3]
-            delta_step = feature[4]
-
-            sphere[LidarChannels.distance][theta][phi] = r
-            sphere[LidarChannels.flag][theta][phi] = entity_type
-            sphere[LidarChannels.time][theta][phi] = delta_step
-
-        return sphere
+    
+    
 
 
     
-    def update(self):
+    def update_data(self):
         # retrieve last positions and entity types from all publishers, excluding agent
         
         snapshots = self.get_snapshots_by_distance()
@@ -154,9 +133,9 @@ class FusedLiDAR(BaseLidar):
             if not snapshot.position:
                 continue
             # reframe
-            reframed_snapshot_position = reframe(snapshot.position, np.zeros(3), agent.position)
-            spherical = cartesian_to_spherical(reframed_snapshot_position)
-            spherical = normalize_spherical(spherical, lidar_spec=self.lidar_spec)
+            reframed_snapshot_position = self.math.reframe(snapshot.position, np.zeros(3), agent.position)
+            spherical = self.math.cartesian_to_spherical(reframed_snapshot_position)
+            spherical = self.math.normalize_spherical(spherical)
             # the lidars data are always
             # from the loyal wingman.
            
@@ -165,10 +144,59 @@ class FusedLiDAR(BaseLidar):
             features.append((*spherical, snapshot.entity_type, delta_step))
 
         new_sphere = self.lidar_spec.empty_sphere()
-        self.sphere = self.add_features(new_sphere, features)
+        self.sphere = self.math.add_features(new_sphere, features)
+        self.buffer_manager.buffer_message({"lidar": self.sphere, "step": self.buffer_manager.current_step}, self.parent_id, TopicsEnum.LIDAR_DATA_BROADCAST)
 
 
 
     def read_data(self) -> Dict:
-        self._update_sphere_stack()
+        self.sphere_stack = self._update_sphere_stack()
+        #TODO: I need to add mask on fused lidar
         return {"lidar": self.sphere, "fused_lidar": self.sphere_stack}
+    
+    def reset(self):
+        pass
+
+
+    def get_data_shape(self) -> Tuple:
+        """
+        
+        return the shape together with the mask
+        """
+        return self.lidar_spec.stacked_output_shapes(self.n_neighbors_max)
+    
+    def _update_sphere_stack(self) -> Tuple[np.ndarray, np.ndarray]:
+        agent = self.buffer_manager.get_latest_snapshot(self.parent_id)
+        if agent is None or agent.sphere is None:
+            # Return zeros and mask of all False
+            empty_stack, empty_mask = self._empty_stack_and_mask()
+            return empty_stack, empty_mask
+
+        neighborhood: List[PerceptionSnapshot] = self.bootstrap()
+        sphere_stack: List[np.ndarray] = [agent.sphere]
+        mask: List[bool] = [True]
+
+        for neighbor in neighborhood:
+            reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, agent=agent)
+            if reframed is not None:
+                sphere_stack.append(reframed)
+                mask.append(True)
+
+        # Pad with empty spheres if needed
+        max_total = 1 + self.n_neighbors_max
+        while len(sphere_stack) < max_total:
+            sphere_stack.append(self.lidar_spec.empty_sphere())
+            mask.append(False)
+
+        # Ensure shape is consistent (N, C, θ, φ)
+        stacked = np.stack(sphere_stack, axis=0)
+        mask_np = np.array(mask, dtype=bool)
+
+        return stacked, mask_np
+    
+    def _empty_stack_and_mask(self) -> Tuple[np.ndarray, np.ndarray]:
+        empty = self.lidar_spec.empty_sphere()
+        stack = np.stack([empty] * (1 + self.n_neighbors_max), axis=0)
+        mask = np.zeros((1 + self.n_neighbors_max,), dtype=bool)
+        return stack, mask
+

@@ -5,7 +5,7 @@ import pybullet as p # type: ignore
 from gymnasium import spaces
 
 from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
-from core.entities.quadcopters.components.sensors.interfaces.lidar_interface import BaseLidar, Channels, CoordinateConverter
+from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar, LidarChannels
 
 from core.entities.entity_type import EntityType
 from core.notification_system.topics_enum import TopicsEnum
@@ -42,7 +42,7 @@ class LIDAR(BaseLidar):
         self.debug_line_id = -1
         self.debug_lines_id = []
 
-        self.n_channels: int = len(Channels)
+        self.n_channels: int = len(LidarChannels)
 
         self.flag_size = 3
 
@@ -65,8 +65,8 @@ class LIDAR(BaseLidar):
         self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=1)
         self.parent_inertia: Dict = {}
 
-        self.DISTANCE_CHANNEL_IDX: int = Channels.DISTANCE_CHANNEL.value
-        self.FLAG_CHANNEL_IDX: int = Channels.FLAG_CHANNEL.value
+        self.DISTANCE_CHANNEL_IDX: int = LidarChannels.distance.value
+        self.FLAG_CHANNEL_IDX: int = LidarChannels.flag.value
 
         self.threshold: float = 1
 
@@ -188,7 +188,7 @@ class LIDAR(BaseLidar):
         distance: np.float32 = np.linalg.norm(rotated_position)
 
         if distance > 0 and distance < self.radius:
-            spherical: np.ndarray = CoordinateConverter.cartesian_to_spherical(
+            spherical: np.ndarray = self.math.cartesian_to_spherical(
                 rotated_position
             )
             self._add_spherical(target_id, spherical, flag)
@@ -259,8 +259,8 @@ class LIDAR(BaseLidar):
         return message.get("position")
 
     def update_data(self) -> None:
-        buffer_data = self.buffer_manager.get_latest_from_topic(
-            TopicsEnum.INERTIAL_DATA_BROADCAST)
+        buffer_data = self.buffer_manager.get_latest_messages_from_topic(
+            topic=TopicsEnum.INERTIAL_DATA_BROADCAST, exclude_publisher_id=self.parent_id)
         self.reset()
 
         for target_id, message in buffer_data.items():
@@ -321,11 +321,11 @@ class LIDAR(BaseLidar):
         print(
             f"Sphere_Shape = {self.sphere.shape}, radius {self.radius} \n Sphere \n {self.sphere}"
         )
-        for theta_point in range(len(self.sphere[Channels.DISTANCE_CHANNEL.value])):
+        for theta_point in range(len(self.sphere[LidarChannels.distance.value])):
             for phi_point in range(
-                len(self.sphere[Channels.DISTANCE_CHANNEL.value][theta_point])
+                len(self.sphere[LidarChannels.distance.value][theta_point])
             ):
-                distance = self.sphere[Channels.DISTANCE_CHANNEL.value][theta_point][
+                distance = self.sphere[LidarChannels.distance.value][theta_point][
                     phi_point
                 ]
                 if distance < 1:
@@ -369,7 +369,7 @@ class LIDAR(BaseLidar):
         theta, phi = self.convert_angle_point_to_angles(
             theta_point, phi_point, n_theta_points, n_phi_points
         )
-        cartesian_from_origin = CoordinateConverter.spherical_to_cartesian(
+        cartesian_from_origin = self.math.spherical_to_cartesian(
             np.array([distance * self.radius, theta, phi])
         )
         return cartesian_from_origin + current_position

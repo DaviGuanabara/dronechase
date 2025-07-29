@@ -12,8 +12,9 @@ from pybullet_utils.bullet_client import BulletClient  # type: ignore
 # Components
 # =================================================================================================================
 
-from core.entities.quadcopters.components import LIDAR, FusedLiDAR, InertialMeasurementUnit, FlightStateDataType, FlightStateManager, Gun
+from core.entities.quadcopters.components import LIDAR, FusedLIDAR, InertialMeasurementUnit, FlightStateDataType, FlightStateManager, Gun
 from core.entities.entity_type import EntityType
+from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar
 from core.notification_system import TopicsEnum, MessageHub
 
 # TODO: remove subscrition of current step of the components, i should centralize this here (at quadcopter class).
@@ -27,16 +28,19 @@ class Quadcopter:
         self,
         quadx: QuadX,
         simulation: BulletClient,
+        lidar:Optional[BaseLidar] = None,
         quadcopter_type: EntityType = EntityType.QUADCOPTER,
         quadcopter_name: Optional[str] = "",
         debug_on: bool = False,
         lidar_on: bool = False,
-        lidar_radius: float = 5,
-        lidar_resolution: int = 16,
+        #lidar_radius: float = 5,
+        #lidar_resolution: int = 16,
         shoot_range: float = 0.8,
         formation_position: np.ndarray = np.array([0, 0, 0]),
-        lidar_class=LIDAR
+        
     ):
+        
+        self.step = 0
         self.quadx = quadx
         self.formation_position = formation_position
 
@@ -52,9 +56,14 @@ class Quadcopter:
         # print("init components")
         self.flight_state_manager: FlightStateManager = FlightStateManager()
         self.imu = InertialMeasurementUnit(quadx)
-        self.lidar = lidar_class(
-            self.id, self.client_id, radius=lidar_radius, resolution=lidar_resolution
-        )
+        
+        if lidar is None:
+            self.lidar_on = False
+        else:
+            self.lidar = lidar
+        #lidar_class(
+         #   self.id, self.client_id, radius=lidar_radius, resolution=lidar_resolution
+        #)
         self.setup_gun(self.id, shoot_range)
 
         self.setup_message_hub()
@@ -132,8 +141,12 @@ class Quadcopter:
         quadx.set_mode(6)
 
         # print(f"Lidar Radius: {lidar_radius}")
+        lidar_resolution = 16
 
-        lidar_class = FusedLiDAR if use_fused_lidar else LIDAR
+        lidar_class = FusedLIDAR if use_fused_lidar else LIDAR
+        lidar = lidar_class(quadx.Id, simulation._client, radius=lidar_radius,resolution=lidar_resolution,debug=debug_on)
+
+
 
         return Quadcopter(
             simulation=simulation,
@@ -142,9 +155,9 @@ class Quadcopter:
             quadcopter_type=EntityType.LOYALWINGMAN,
             debug_on=debug_on,
             lidar_on=lidar_on,
-            lidar_radius=lidar_radius,
+            #lidar_radius=lidar_radius,
             formation_position=position,
-            lidar_class=lidar_class
+            lidar=lidar
         )
 
     @staticmethod
@@ -158,6 +171,7 @@ class Quadcopter:
         lidar_on: bool = False,
         lidar_radius: float = 5,
     ):
+        #TODO: I WILL TREAT LIDAR ALWAYS OFF FOR LOITERING MUNITION
         quadx = QuadX(
             simulation,
             start_pos=position,
@@ -180,7 +194,6 @@ class Quadcopter:
             debug_on=debug_on,
             lidar_on=lidar_on,
             formation_position=position,
-            lidar_class=LIDAR
         )
 
     # =================================================================================================================
@@ -220,6 +233,15 @@ class Quadcopter:
             subscriber=self._subscriber_lidar_data
         )
 
+        self.messageHub.subscribe(
+            topic=TopicsEnum.AGENT_STEP_BROADCAST,
+            subscriber=self._subscriber_broadcast_step
+        )
+
+
+    def _publish_lidar_data(self, message: Dict, publisher_id: int):
+        self.messageHub.publish(TopicsEnum.LIDAR_DATA_BROADCAST, message, publisher_id, self.step)
+
     def _subscriber_lidar_data(self, message: Dict, publisher_id: int):
         """
         Handle incoming LiDAR data from the message hub.
@@ -233,21 +255,22 @@ class Quadcopter:
             self.lidar.buffer_lidar_data(message, publisher_id)
 
     def _publish_inertial_data(self):
-        # TODO: broadcast with current step
+        
         """
         Publish the current flight state data to the message hub.
+        All publishment from quadcopter sensors must have the publihser_type
         """
         inertial_data = self.flight_state_manager.get_inertial_data()
         inertial_data["dimensions"] = self.dimensions
 
-        #TODO: ALL PUBLISHING MUST HAVE PUBLISHER TYPE
+        
         message = {**inertial_data, "publisher_type": self.quadcopter_type}
-        # print(message)
-        # print("Publishing intertial data")
+
         self.messageHub.publish(
             topic=TopicsEnum.INERTIAL_DATA_BROADCAST,
             message=message,
             publisher_id=self.id,
+            step=self.step
         )
 
     def _subscriber_inertial_data(self, message: Dict, publisher_id: int):
@@ -262,6 +285,13 @@ class Quadcopter:
         if self.lidar_on:
             self.lidar.buffer_inertial_data(message, publisher_id)
 
+    def _subscriber_broadcast_step(self, message: Dict, publisher_id: int):
+        step = message.get("step")
+        if step is not None:
+            self.step = step
+        #TODO: update_step in BaseLidar
+        self.lidar.buffer_step_broadcast(message, publisher_id)
+
     # =================================================================================================================
     # Sensors and Flight State
     # =================================================================================================================
@@ -275,6 +305,7 @@ class Quadcopter:
         self.lidar.update_data()
         lidar_data = self.lidar.read_data()
         self._update_flight_state(lidar_data)
+        self._publish_lidar_data(lidar_data, self.id)
         # if self.debug_on:
         #    self.lidar.debug_sphere()
         # Note: We don't publish the flight state here

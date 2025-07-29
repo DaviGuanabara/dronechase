@@ -93,12 +93,13 @@ class EntitiesManager:
                     use_fused_lidar=use_fused_lidar,
                 )
             else:
+                #TODO: LIDAR ON LOITERING MUNITION SHOULD BE OFF, IS NOT ?
                 drone = Quadcopter.spawn_loiteringmunition(
                     self.simulation,
                     position,
                     name,
                     debug_on=False,
-                    lidar_on=True,
+                    lidar_on=False, #lidar_on must be off for loitering munition. It were True
                     lidar_radius=lidar_radius,
                 )
 

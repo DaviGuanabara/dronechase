@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Dict
 
 
 class Sensor(ABC):
@@ -7,7 +8,7 @@ class Sensor(ABC):
         self.client_id = client_id
 
     @abstractmethod
-    def read_data(self):
+    def read_data(self) -> Dict:
         pass
 
     @abstractmethod

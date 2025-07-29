@@ -1,5 +1,5 @@
 import random
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.entities.entity_type import EntityType
@@ -139,9 +139,7 @@ class LiDARBufferManager:
 
         snapshot = self.buffer[publisher_id][delta_step]
         if snapshot is None:
-            snapshot = PerceptionSnapshot(
-                topics={}, publisher_id=publisher_id, step=step, entity_type=entity_type
-            )
+            snapshot = PerceptionSnapshot(topics={}, publisher_id=publisher_id, step=step, entity_type=entity_type, max_delta_step=self.max_buffer_size)
             self.buffer[publisher_id][delta_step] = snapshot
 
         snapshot.update(topic=topic, data=message)
@@ -220,3 +218,36 @@ class LiDARBufferManager:
             delta_step=0,
             exclude_publisher_id=exclude_publisher_id
         )
+    
+    def get_latest_messages_from_topic(
+        self,
+        topic: TopicsEnum,
+        entity_type: Optional[EntityType] = None,
+        exclude_publisher_id: Optional[int] = None
+    ) -> Dict[int, Dict]:
+        """
+        Returns the latest messages (step = current_step) that contain the specified topic,
+        structured as a dictionary: {publisher_id: message}
+
+        Parameters:
+        - topic: the topic to filter messages by
+        - entity_type: optional filter for the entity type (e.g., LOYALWINGMAN)
+        - exclude_publisher_id: optional ID to exclude from results
+
+        Returns:
+        - Dict[int, Dict]: A mapping of publisher_id to the topic-specific message
+        """
+        snapshots = self.retrieve_snapshots(
+            topic=topic,
+            entity_type=entity_type,
+            delta_step=0,
+            exclude_publisher_id=exclude_publisher_id
+        )
+
+        return {
+            snapshot.publisher_id: snapshot.topics[topic]
+            for snapshot in snapshots
+            if topic in snapshot.topics
+        }
+
+

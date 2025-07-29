@@ -40,6 +40,32 @@ class LIDARSpec:
     def shape(self) -> Tuple[int, int, int]:
         return self.n_channels, self.n_theta_points, self.n_phi_points
 
+    def stacked_sphere_shape(self, max_neighbors: int) -> Tuple[int, int, int, int]:
+        """
+        Return the shape of a stacked sphere: (N, C, θ, φ)
+        where N = 1 (agent) + max_neighbors
+        """
+        return (1 + max_neighbors, *self.shape)
+
+    def stacked_mask_shape(self, max_neighbors: int) -> Tuple[int]:
+        """
+        Return the shape of the mask for the stacked sphere.
+        Each entry corresponds to whether that sphere is valid.
+        """
+        return (1 + max_neighbors,)
+    
+    def stacked_output_shapes(self, max_neighbors: int) -> Tuple[Tuple[int, int, int, int], Tuple[int]]:
+        """
+        Returns the shapes for:
+        - stacked_sphere: (1 + max_neighbors, C, θ, φ)
+        - mask: (1 + max_neighbors,)
+        """
+        stacked_sphere_shape = (1 + max_neighbors, *self.shape)
+        mask_shape = (1 + max_neighbors,)
+        return stacked_sphere_shape, mask_shape
+
+
+
     #@property
     def empty_sphere(self) -> np.ndarray:  # sourcery skip: remove-unreachable-code
         """
@@ -52,6 +78,14 @@ class LIDARSpec:
         """
 
         return np.ones(self.shape, dtype=np.float32)
+    
+    def reset_sphere(self, sphere:np.ndarray):
+        """
+        fill all cells with one
+        """
+        sphere.fill(1)
+    
+
 
 
 

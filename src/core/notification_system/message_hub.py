@@ -29,8 +29,10 @@ class MessageHub:
         """Unsubscribe from a specific topic."""
         self.get_broker(topic).unsubscribe(topic, subscriber)
 
-    def publish(self, topic: TopicsEnum, message: Dict, publisher_id: int) -> None:
+    def publish(self, topic: TopicsEnum, message: Dict, publisher_id: int, step:Optional[int] = None) -> None:
         """Publish a message to a topic."""
+        if step is not None:
+            message["step"] = step
         self._register_publisher(topic, publisher_id)
         self.get_broker(topic).publish(topic, message, publisher_id)
 
