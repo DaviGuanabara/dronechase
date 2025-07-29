@@ -140,7 +140,7 @@ class FusedLiDAR(BaseLidar):
 
 
     
-    def _update_own_sphere(self):
+    def update(self):
         # retrieve last positions and entity types from all publishers, excluding agent
         
         snapshots = self.get_snapshots_by_distance()
@@ -161,12 +161,14 @@ class FusedLiDAR(BaseLidar):
             # from the loyal wingman.
            
             delta_step = 0 #current delta step
-            features.append((*spherical, EntityType.LOYALWINGMAN, delta_step)) # mount features
-        
+            # mount features
+            features.append((*spherical, snapshot.entity_type, delta_step))
+
         new_sphere = self.lidar_spec.empty_sphere()
         self.sphere = self.add_features(new_sphere, features)
 
 
 
     def read_data(self) -> Dict:
+        self._update_sphere_stack()
         return {"lidar": self.sphere, "fused_lidar": self.sphere_stack}
