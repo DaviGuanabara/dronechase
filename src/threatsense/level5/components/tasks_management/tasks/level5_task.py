@@ -653,14 +653,16 @@ class Level5_Task(Task):
         allies_pos = positions[1:]
         ally_names = [f"Ally{i}" for i in range(1, self.NUM_PURSUERS)]
 
-        # Spawna agente com FusedLiDAR
+        #TODO: There is a problem here
+        # this 'agent' is not the agent. This is misleading.
+        # Spawn a agente com FusedLiDAR
         agent = self.entities_manager.spawn_pursuer(
             positions=agent_pos, names=agent_name, lidar_radius=2 * self.dome_radius, use_fused_lidar=True,
         )
 
         # Spawna aliados com LiDAR padrão
         allies = self.entities_manager.spawn_pursuer(
-            allies_pos, ally_names, lidar_radius=2 * self.dome_radius, use_fused_lidar=False
+            allies_pos, ally_names, lidar_radius=2 * self.dome_radius, use_fused_lidar=True
         )
 
         # Junta todos

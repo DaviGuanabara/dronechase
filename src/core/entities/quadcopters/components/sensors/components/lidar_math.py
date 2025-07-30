@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple, Union
 
 from core.dataclasses.angle_grid import LIDARSpec
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
+from core.entities.entity_type import EntityType
 from core.enums.channel_index import LidarChannels
 
 
@@ -178,10 +179,12 @@ class LidarMath:
 
             if current_time == 0:
                 continue  # Don't overwrite freshest data
-
+            
+            #TODO: I really need to find a better way to handle the entity_type inside the flag channel.
             if delta_step < current_time:
                 sphere[LidarChannels.distance.value][theta_idx][phi_idx] = r
-                sphere[LidarChannels.flag.value][theta_idx][phi_idx] = entity_type
+                sphere[LidarChannels.flag.value][theta_idx][phi_idx] = entity_type.value / 5 if isinstance(
+                    entity_type, EntityType) else entity_type
                 sphere[LidarChannels.time.value][theta_idx][phi_idx] = delta_step
 
         return sphere

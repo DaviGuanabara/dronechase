@@ -273,10 +273,16 @@ class Level5Environment(Env):
         observation_shape = self.observation_shape()
         return spaces.Dict(
             {
-                "lidar": spaces.Box(
+                "stacked_lidar": spaces.Box(
                     0,
                     1,
-                    shape=observation_shape["lidar"],
+                    shape=observation_shape["stacked_lidar"],
+                    dtype=np.float32,
+                ),
+                "validity_mask": spaces.Box(
+                    0,
+                    1,
+                    shape=observation_shape["validity_mask"],
                     dtype=np.float32,
                 ),
                 "inertial_data": spaces.Box(
@@ -291,12 +297,7 @@ class Level5Environment(Env):
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
-                # "gun": spaces.Box(
-                #    -1,
-                #    1,
-                #    shape=observation_shape["gun"],
-                #    dtype=np.float32,
-                # ),
+
             }
         )
 
@@ -315,19 +316,21 @@ class Level5Environment(Env):
         inertial_data = position + velocity + attitude + angular_rate + gun_state
 
         lidar = rl_agent.lidar
-        if isinstance(lidar, FusedLIDAR):
-            return {
-                "stacked_lidar": lidar.get_stacked_lidar_shape(),
-                "validity_mask": lidar.get_validity_mask_shape(),
-                "inertial_data": inertial_data,
-                "last_action": last_action_shape,
-            }
-
+        if not isinstance(lidar, FusedLIDAR):
+            assert False, "Lidar should be FusedLIDAR"
+        #if isinstance(lidar, FusedLIDAR):
         return {
-            "lidar": rl_agent.lidar_shape,
+            "stacked_lidar": lidar.get_stacked_lidar_shape(),
+            "validity_mask": lidar.get_validity_mask_shape(),
             "inertial_data": inertial_data,
             "last_action": last_action_shape,
         }
+
+        #return {
+        #    "lidar": rl_agent.lidar_shape,
+        #    "inertial_data": inertial_data,
+        #    "last_action": last_action_shape,
+        #}
 
     ## Helpers #####################################################################
 

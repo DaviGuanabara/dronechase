@@ -127,12 +127,12 @@ class FusedLIDAR(BaseLidar):
         snapshots = self.get_snapshots_by_distance()
         agent = self.get_agent()
 
-        if not agent or not agent.position:
+        if agent is None or agent.position is None:
             return
 
         features = []
         for snapshot in snapshots:
-            if not snapshot.position:
+            if snapshot.position is None:
                 continue
             # reframe
             reframed_snapshot_position = self.math.reframe(snapshot.position, np.zeros(3), agent.position)
@@ -147,7 +147,7 @@ class FusedLIDAR(BaseLidar):
 
         new_sphere = self.lidar_spec.empty_sphere()
         self.sphere = self.math.add_features(new_sphere, features)
-        self.buffer_manager.buffer_message({"lidar": self.sphere, "step": self.buffer_manager.current_step}, self.parent_id, TopicsEnum.LIDAR_DATA_BROADCAST)
+        self.buffer_manager.buffer_message_directly({"lidar": self.sphere, "step": self.buffer_manager.current_step}, self.parent_id, TopicsEnum.LIDAR_DATA_BROADCAST)
 
 
 

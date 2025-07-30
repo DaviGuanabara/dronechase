@@ -104,7 +104,26 @@ class LiDARBufferManager:
         pass
 
   
+    def buffer_message_directly(self,
+                                 message: Dict,
+                                 publisher_id: int,
+                                 topic: TopicsEnum,):
+        """
+        This method is not implemented.
+        It is a placeholder for future functionality.
+        """
 
+        message_context = MessageContext(
+            publisher_id=publisher_id,
+            step=self.current_step,
+            entity_type=self.publisher_entity_map.get(publisher_id)
+        )
+
+        self.buffer_message(
+            message=message,
+            message_context=message_context,
+            topic=topic
+        )
 
 
     def buffer_message(

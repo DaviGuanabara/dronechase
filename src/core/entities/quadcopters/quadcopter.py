@@ -128,7 +128,7 @@ class Quadcopter:
         debug_on: bool = False,
         lidar_on: bool = False,
         lidar_radius: float = 5,
-        use_fused_lidar: bool = False,
+        use_fused_lidar: bool = True,
     ):
         quadx = QuadX(
             simulation,
