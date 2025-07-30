@@ -65,7 +65,7 @@ class BaseLidar(Sensor):
             self.lidar_spec.reset_sphere(self.sphere)
 
 
-    def get_agent(self) -> Optional[PerceptionSnapshot]:
+    def get_agent_snapshot(self) -> Optional[PerceptionSnapshot]:
         return self.buffer_manager.get_latest_snapshot(self.parent_id)
     
     @abstractmethod

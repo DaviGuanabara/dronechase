@@ -101,18 +101,21 @@ class FusedLIDAR(BaseLidar):
         """
         Return threats (LOITERINGMUNITION) within the max LiDAR radius.
         """
-        latests = self.buffer_manager.get_latests(self.parent_id)
-        max_radius: float = self.lidar_spec.max_radius
+        #TODO: GET THE NEIGHBORS FROM THE BUFFER MANAGER.
+        #WHERE IS THE OTHERS SNAPSHOTS NEIGHBORS ? I HVAVE TO GET THEM FROM THE BUFFER MANAGER.
+        #latests = self.buffer_manager.get_latests(self.parent_id)
+        #max_radius: float = self.lidar_spec.max_radius
 
-        agent_snapshot = self.get_agent()
-        if not agent_snapshot or agent_snapshot.position is None:
+        agent_snapshot = self.get_agent_snapshot()
+        #print(f"[DEBUG] FusedLIDAR: Agent snapshot: {agent_snapshot}")
+        if agent_snapshot is None or agent_snapshot.position is None:
             return []
 
-        agent_pos = agent_snapshot.position
+        #agent_pos = agent_snapshot.position
 
-        return [
-            latest for latest in latests
-            if latest.position is not None and np.linalg.norm(latest.position - agent_pos) <= max_radius
+        return [agent_snapshot
+            #latest for latest in latests
+            #if latest.position is not None
         ]
 
     
@@ -125,7 +128,8 @@ class FusedLIDAR(BaseLidar):
         # retrieve last positions and entity types from all publishers, excluding agent
         
         snapshots = self.get_snapshots_by_distance()
-        agent = self.get_agent()
+        print(f"[DEBUG] FusedLIDAR: {len(snapshots)} snapshots retrieved for fusion.")
+        agent = self.get_agent_snapshot()
 
         if agent is None or agent.position is None:
             return
@@ -134,7 +138,14 @@ class FusedLIDAR(BaseLidar):
         for snapshot in snapshots:
             if snapshot.position is None:
                 continue
+
+            extracted = self.math.extract_features(
+                snapshot.sphere, self.lidar_spec)
             # reframe
+            #TODO: HUGE PROBLEM HERE. 
+            #SNAPSHOT CONTAINS THE LIDAR, THAT I NEED TO EXTRACT THE FEATURES FROM THE SPHERE.
+            # THEN EACH FEATURE SHOULD BE REFRAMED, NORMALIZED, ETC.
+            print(f"[DEBUG] FusedLIDAR: Reframing snapshot position: {snapshot.position}")
             reframed_snapshot_position = self.math.reframe(snapshot.position, np.zeros(3), agent.position)
             spherical = self.math.cartesian_to_spherical(reframed_snapshot_position)
             spherical = self.math.normalize_spherical(spherical)
@@ -144,6 +155,7 @@ class FusedLIDAR(BaseLidar):
             delta_step = 0 #current delta step
             # mount features
             features.append((*spherical, snapshot.entity_type, delta_step))
+            print(f"[DEBUG] FusedLIDAR: Feature added: {features[-1]}")
 
         new_sphere = self.lidar_spec.empty_sphere()
         self.sphere = self.math.add_features(new_sphere, features)
@@ -158,7 +170,11 @@ class FusedLIDAR(BaseLidar):
         self.sphere_stack = self._build_valid_spheres()
         padded_stack, mask = self._pad_sphere_stack(self.sphere_stack)
         #TODO: REMOVE THE PRINT
-        print({"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask})
+        #print({"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask})
+        print(
+            f"[DEBUG] valid_spheres count: {len(self.sphere_stack)} / expected: {self.n_neighbors_max + 1}")
+        print(f"[DEBUG] padded_stack shape: {padded_stack.shape}, mask shape: {mask.shape}, mask: {mask}")
+
         return {"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask}
 
     def reset(self):
@@ -217,6 +233,7 @@ class FusedLIDAR(BaseLidar):
 
         # Stack into single array (N, C, θ, φ)
         sphere_stack_padded = np.stack(padded_spheres, axis=0)
+        print(f"[DEBUG] validity_mask: {validity_mask}")
 
         return sphere_stack_padded, validity_mask
 
