@@ -1,23 +1,14 @@
 
-from typing import List, Tuple
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple, Union
+from typing import Dict, List, Tuple
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
-from core.entities.entity_type import EntityType
-from core.entities.quadcopters.components.sensors.lidar import LIDAR
-from core.notification_system.message_hub import MessageHub
 from core.notification_system.topics_enum import TopicsEnum
 from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar
-from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
+
 
 
 import numpy as np
 import random
-import time
-
-from core.dataclasses.normalization import NormalizationConfig
-from core.dataclasses.angle_grid import LIDARSpec
-from core.enums.channel_index import LidarChannels
-from core.dataclasses.perception_keys import PerceptionKeys
 
 
 class FusedLIDAR(BaseLidar):
@@ -68,8 +59,11 @@ class FusedLIDAR(BaseLidar):
         n_neighbors_min: int = 1,
         n_neighbors_max: int = 5,
         debug: bool = False,
+        activate_fusion: bool = False,
     ):
         super().__init__(parent_id, client_id, debug, radius, resolution, n_neighbors_min, n_neighbors_max)
+        print("Fused Lidar created")
+        self.activate_fusion: bool = False
 
 
     def bootstrap(self) -> List[PerceptionSnapshot]:
@@ -158,24 +152,40 @@ class FusedLIDAR(BaseLidar):
 
 
     def read_data(self) -> Dict:
+        if not self.activate_fusion:
+            return {"lidar": self.sphere}
+        
         self.sphere_stack = self._build_valid_spheres()
         padded_stack, mask = self._pad_sphere_stack(self.sphere_stack)
-        #TODO: I need to add mask on fused lidar
+        #TODO: REMOVE THE PRINT
+        print({"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask})
         return {"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask}
 
     def reset(self):
         pass
 
 
-    def get_data_shape(self) -> Tuple:
+    def get_data_shape(self) -> Union[Dict[str, Tuple[int, ...]], Tuple[int, int, int]]:
         """
         
         return the shape together with the mask
         """
+
+        #TODO Shape from fused lidar got 1 additional channel then LIDAR class.
+        return self.lidar_spec.shape
+    
+    def get_stacked_lidar_shape(self):
         #TODO: How to handle the mask?
         # The shape is (N, C, θ, φ) where N = 1 + max_neighbors
         # and C, θ, φ are defined by the LIDARSpec.
-        return self.lidar_spec.stacked_output_shapes(self.n_neighbors_max)
+        return self.lidar_spec.get_stacked_lidar_shape(self.n_neighbors_max)
+    
+    def get_validity_mask_shape(self):
+        #TODO: How to handle the mask?
+        # The shape is (N, C, θ, φ) where N = 1 + max_neighbors
+        # and C, θ, φ are defined by the LIDARSpec.
+        return self.lidar_spec.get_validity_mask_shape(self.n_neighbors_max)
+
 
     def _pad_sphere_stack(
         self,
@@ -209,3 +219,7 @@ class FusedLIDAR(BaseLidar):
         sphere_stack_padded = np.stack(padded_spheres, axis=0)
 
         return sphere_stack_padded, validity_mask
+
+    def enable_fusion(self):
+        self.activate_fusion = True
+        print("Fused lidar activated")

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import math
 
 
+from core.dataclasses.message_context import MessageContext
 from threatsense.level5.components.normalization import normalize_inertial_data
 from threatsense.level5.components.tasks_management.task_progression import TaskStatus, Task
 from threatsense.level5.components.entities_manager import EntitiesManager, Quadcopter
@@ -37,13 +38,13 @@ class Level5_Task(Task):
         dome_radius: float,
         # debug_on: bool = False,
         building_position: np.ndarray = np.array([0, 0, 0.1]),
-        use_fused_lidar=False
+       
     ):
         print("Level 5 - Task Init")
 
         self.dome_radius = dome_radius
         self.entities_manager = entities_manager
-        self.use_fused_lidar = use_fused_lidar
+        self.use_fused_lidar = True
 
         print("init constants and globals")
         self.init_constants()
@@ -68,7 +69,7 @@ class Level5_Task(Task):
 
         print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
 
-    def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
+    def _subscriber_simulation_step(self, message: Dict, message_context: MessageContext):
         self.current_step = message.get("step", 0)
         self.timestep = message.get("timestep", 0)
 
@@ -654,12 +655,12 @@ class Level5_Task(Task):
 
         # Spawna agente com FusedLiDAR
         agent = self.entities_manager.spawn_pursuer(
-            positions=agent_pos, names=agent_name, lidar_radius=2 * self.dome_radius, use_fused_lidar=self.use_fused_lidar,
+            positions=agent_pos, names=agent_name, lidar_radius=2 * self.dome_radius, use_fused_lidar=True,
         )
 
         # Spawna aliados com LiDAR padrão
         allies = self.entities_manager.spawn_pursuer(
-            allies_pos, ally_names, lidar_radius=2 * self.dome_radius
+            allies_pos, ally_names, lidar_radius=2 * self.dome_radius, use_fused_lidar=False
         )
 
         # Junta todos

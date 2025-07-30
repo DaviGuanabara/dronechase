@@ -4,6 +4,7 @@ from typing import Tuple, List, Dict
 import pybullet as p # type: ignore
 from gymnasium import spaces
 
+from core.dataclasses.message_context import MessageContext
 from core.entities.quadcopters.components.sensors.components.lidar_buffer import LiDARBufferManager
 from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar, LidarChannels
 
@@ -35,6 +36,8 @@ class LIDAR(BaseLidar):
         max_distance: float, the radius of the sphere
         resolution: number of sectors per m2
         """
+
+        super().__init__(parent_id, client_id, debug, radius, resolution)
 
         self.parent_id = parent_id
         self.client_id = client_id
@@ -231,7 +234,7 @@ class LIDAR(BaseLidar):
         Then, 'read_data' that returns the data to the sensor manager
     """
 
-    def buffer_inertial_data(self, message: Dict, publisher_id: int):
+    def buffer_inertial_data(self, message: Dict, message_context: MessageContext):
         """
         Flight State here is only the inertial data
         This is the first step to update the sensor data
@@ -241,15 +244,14 @@ class LIDAR(BaseLidar):
         topic: TopicsEnum = TopicsEnum.INERTIAL_DATA_BROADCAST
         # print("buffer_inertial_data", message, publisher_id)
         if "termination" in message:
-            self.buffer_manager.close_buffer(publisher_id, topic)
+            self.buffer_manager.close_buffer(message_context.publisher_id, topic)
 
-        elif publisher_id == self.parent_id:
+        elif message_context.publisher_id == self.parent_id:
             self.parent_inertia = message
         else:
             # print("buffer_inertial_data", message, publisher_id)
             self.buffer_manager.buffer_message(
-                message=message, publisher_id=publisher_id, topic=topic, step=self.buffer_manager.current_step
-            )
+                message=message, message_context=message_context, topic=topic)
 
     def process_message(self, message):
         """

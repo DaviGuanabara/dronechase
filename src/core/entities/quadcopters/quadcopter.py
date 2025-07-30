@@ -12,6 +12,7 @@ from pybullet_utils.bullet_client import BulletClient  # type: ignore
 # Components
 # =================================================================================================================
 
+from core.dataclasses.message_context import MessageContext
 from core.entities.quadcopters.components import LIDAR, FusedLIDAR, InertialMeasurementUnit, FlightStateDataType, FlightStateManager, Gun
 from core.entities.entity_type import EntityType
 from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar
@@ -228,21 +229,38 @@ class Quadcopter:
             subscriber=self._subscriber_inertial_data,
         )
 
-        self.messageHub.subscribe(
-            topic=TopicsEnum.LIDAR_DATA_BROADCAST,
-            subscriber=self._subscriber_lidar_data
-        )
+        if self.lidar_on:
+            self.messageHub.subscribe(
+                topic=TopicsEnum.LIDAR_DATA_BROADCAST,
+                subscriber=self._subscriber_lidar_data
+            )
 
         self.messageHub.subscribe(
             topic=TopicsEnum.AGENT_STEP_BROADCAST,
             subscriber=self._subscriber_broadcast_step
         )
 
+    def _publish(self, topic:TopicsEnum, message: Dict):
+        message_context = self.messageHub.create_message_context(publisher_id=self.id, step = self.step, entity_type=self.quadcopter_type)
+        self.messageHub.publish(topic=topic, message=message, message_context=message_context)
 
-    def _publish_lidar_data(self, message: Dict, publisher_id: int):
-        self.messageHub.publish(TopicsEnum.LIDAR_DATA_BROADCAST, message, publisher_id, self.step)
 
-    def _subscriber_lidar_data(self, message: Dict, publisher_id: int):
+    def _publish_lidar_data(self, message: Dict):
+        self._publish(topic=TopicsEnum.LIDAR_DATA_BROADCAST, message=message)
+
+    def _publish_inertial_data(self):
+        """
+        Publish the current flight state data to the message hub.
+        All publishment from quadcopter sensors must have the publihser_type
+        """
+        inertial_data = self.flight_state_manager.get_inertial_data()
+        inertial_data["dimensions"] = self.dimensions
+
+        message = {**inertial_data, "publisher_type": self.quadcopter_type}
+        self._publish(topic=TopicsEnum.INERTIAL_DATA_BROADCAST, message=message)
+
+
+    def _subscriber_lidar_data(self, message: Dict, message_context: MessageContext):
         """
         Handle incoming LiDAR data from the message hub.
 
@@ -252,28 +270,10 @@ class Quadcopter:
         """
         # print(f"Received lidar data from {publisher_id}")
         if self.lidar_on:
-            self.lidar.buffer_lidar_data(message, publisher_id)
+            self.lidar.buffer_lidar_data(message, message_context)
 
-    def _publish_inertial_data(self):
-        
-        """
-        Publish the current flight state data to the message hub.
-        All publishment from quadcopter sensors must have the publihser_type
-        """
-        inertial_data = self.flight_state_manager.get_inertial_data()
-        inertial_data["dimensions"] = self.dimensions
-
-        
-        message = {**inertial_data, "publisher_type": self.quadcopter_type}
-
-        self.messageHub.publish(
-            topic=TopicsEnum.INERTIAL_DATA_BROADCAST,
-            message=message,
-            publisher_id=self.id,
-            step=self.step
-        )
-
-    def _subscriber_inertial_data(self, message: Dict, publisher_id: int):
+    
+    def _subscriber_inertial_data(self, message: Dict, message_context: MessageContext):
         """
         Handle incoming flight state data from the message hub.
 
@@ -283,14 +283,15 @@ class Quadcopter:
         """
         # print(f"Received inertial data from {publisher_id}")
         if self.lidar_on:
-            self.lidar.buffer_inertial_data(message, publisher_id)
+            self.lidar.buffer_inertial_data(message, message_context)
 
-    def _subscriber_broadcast_step(self, message: Dict, publisher_id: int):
+    def _subscriber_broadcast_step(self, message: Dict, message_context: MessageContext):
         step = message.get("step")
         if step is not None:
             self.step = step
         #TODO: update_step in BaseLidar
-        self.lidar.buffer_step_broadcast(message, publisher_id)
+        if self.lidar_on:
+            self.lidar.buffer_step_broadcast(message, message_context)
 
     # =================================================================================================================
     # Sensors and Flight State
@@ -302,10 +303,12 @@ class Quadcopter:
 
     def update_lidar(self):
         # print("updating lidar")
-        self.lidar.update_data()
-        lidar_data = self.lidar.read_data()
-        self._update_flight_state(lidar_data)
-        self._publish_lidar_data(lidar_data, self.id)
+        if self.lidar_on:
+   
+            self.lidar.update_data()
+            lidar_data = self.lidar.read_data()
+            self._update_flight_state(lidar_data)
+            self._publish_lidar_data(lidar_data)
         # if self.debug_on:
         #    self.lidar.debug_sphere()
         # Note: We don't publish the flight state here
@@ -575,8 +578,9 @@ class Quadcopter:
         Marks this quadcopter as the agent.
         It updates internal components accordingly (e.g., LiDAR fusion).
         """
-
-        if isinstance(self.lidar, FusedLiDAR):
+        print("drone set as agent")
+        print(f"lidar is Fused ? {isinstance(self.lidar, FusedLIDAR)}")
+        if isinstance(self.lidar, FusedLIDAR):
             #TODO: IN MAINTANANCE
             self.lidar.enable_fusion()
 

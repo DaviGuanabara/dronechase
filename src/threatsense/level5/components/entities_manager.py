@@ -68,7 +68,7 @@ class EntitiesManager:
         quadcopter_type: EntityType,
         names: Union[List[str], str] = "no_name",
         lidar_radius: float = DEFAULT_LIDAR_RADIUS,
-        use_fused_lidar: bool = False,
+        use_fused_lidar: bool = True,
     ) -> List[Quadcopter]:
         # Check if names is a list, if not, convert it to a list
         if not isinstance(names, list):
@@ -115,7 +115,7 @@ class EntitiesManager:
         positions: np.ndarray,
         names: Union[List[str], str] = "no_name",
         lidar_radius: float = DEFAULT_LIDAR_RADIUS,
-        use_fused_lidar=False
+        use_fused_lidar=True
     ) -> List[Quadcopter]:
 
         print("[DEBUG] EntitiesManager: spawning pursuer")

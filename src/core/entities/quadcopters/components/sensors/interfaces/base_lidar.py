@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Tuple
 from abc import ABC, abstractmethod
 from typing import Dict
 from core.dataclasses.angle_grid import LIDARSpec
+from core.dataclasses.message_context import MessageContext
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.entities.quadcopters.components.sensors.interfaces.sensor_interface import Sensor
 from core.enums.channel_index import LidarChannels
@@ -34,26 +35,29 @@ class BaseLidar(Sensor):
         self.sphere: np.ndarray = self.lidar_spec.empty_sphere()
         self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10)
         
-    def buffer_lidar_data(self, message: Dict, publisher_id: int):
+    def buffer_lidar_data(self, message: Dict, message_context: MessageContext):
         topic: TopicsEnum = TopicsEnum.LIDAR_DATA_BROADCAST
-        self._buffer_data(message, publisher_id, topic, message.get("step", -1))
+        self._buffer_data(message, message_context, topic)
 
-    def buffer_inertial_data(self, message: Dict, publisher_id: int):
+    def buffer_inertial_data(self, message: Dict, message_context: MessageContext):
         topic: TopicsEnum = TopicsEnum.INERTIAL_DATA_BROADCAST
-        self._buffer_data(message, publisher_id, topic, message.get("step", -1))
+        self._buffer_data(message, message_context, topic)
 
-    def buffer_step_broadcast(self, message: Dict, publisher_id: int):
+    def buffer_step_broadcast(self, message: Dict, message_context: MessageContext):
         self.buffer_manager.update_current_step(message.get("step", self.buffer_manager.current_step))
 
 
-    def _buffer_data(self, message: Dict, publisher_id: int, topic: TopicsEnum, step:int):
+    def _buffer_data(self, message: Dict, message_context: MessageContext, topic: TopicsEnum):
         """
         Método genérico para bufferizar dados de diferentes tópicos.
         """
+
+        message["message_context"] = message_context
         if "termination" in message:
-            self.buffer_manager.close_buffer(publisher_id, topic)
+            self.buffer_manager.close_buffer(message_context.publisher_id, topic)
         else:
-            self.buffer_manager.buffer_message(message, publisher_id, topic, step)
+            step = message_context.step if message_context.step is not None else -1
+            self.buffer_manager.buffer_message(message, message_context=message_context, topic=topic)
 
 
     def _reset_sphere(self):

@@ -1,3 +1,4 @@
+from core.entities.quadcopters.components.sensors.fused_lidar import FusedLIDAR
 from threatsense.level5.components.normalization import normalize_inertial_data
 from threatsense.level5.components.tasks_management.tasks_dispatcher import TasksDispatcher
 from threatsense.level5.components.tasks_management.task_progression import TaskProgression
@@ -46,7 +47,6 @@ class Level5Environment(Env):
         self,
         dome_radius: float = 20,
         rl_frequency: int = 15,
-        use_fused_lidar: bool = False,
         GUI: bool = False,
     ):
         """Initialize the environment."""
@@ -54,7 +54,7 @@ class Level5Environment(Env):
         print("ThreatSense level 5 environment init")
 
         print("Level 5 Environment - init constants")
-        self.init_constants(dome_radius, rl_frequency, use_fused_lidar, GUI)
+        self.init_constants(dome_radius, rl_frequency, GUI)
         self.init_components(dome_radius, GUI)
         self.frequency_adjustments(rl_frequency)
 
@@ -85,12 +85,11 @@ class Level5Environment(Env):
 
     #### Initialization ######################################
 
-    def init_constants(self, dome_radius: float, rl_frequency: int, use_fused_lidar: bool, GUI: bool):
+    def init_constants(self, dome_radius: float, rl_frequency: int, GUI: bool):
         self.dome_radius = dome_radius
         self.debug_on = GUI
         self.show_name_on = GUI
         self.max_step_calls = 20 * rl_frequency
-        self.use_fused_lidar = use_fused_lidar
 
     def init_globals(self):
         self.last_action = np.zeros(4)
@@ -109,7 +108,7 @@ class Level5Environment(Env):
         print("task progression init - Level 5 Environment")
         self.task_progression = TaskProgression(
             TasksDispatcher.level5_tasks(
-                self.dome_radius, self.entities_manager, use_fused_lidar=self.use_fused_lidar)
+                self.dome_radius, self.entities_manager)
         )
 
         self.setup_messange_hub()
@@ -190,12 +189,16 @@ class Level5Environment(Env):
         for _ in range(self.aggregate_sim_steps):
             self.simulation.step()
 
+        ENVIRONMENT_ID = 0
         self.step_counter += 1
-        self.message_hub.publish(
-            TopicsEnum.AGENT_STEP_BROADCAST,
-            {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
-            0,
-        )
+        message = {"step": self.step_counter, "timestep": 1 / self.rl_frequency}
+        message_context = self.message_hub.create_message_context(publisher_id=ENVIRONMENT_ID, step=self.step_counter)
+        self.message_hub.publish(topic=TopicsEnum.AGENT_STEP_BROADCAST, message=message, message_context=message_context)
+        #self.message_hub.publish(
+        #    TopicsEnum.AGENT_STEP_BROADCAST,
+        #    {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
+        #    0, #publisher_id
+        #)
 
     # ====================================================================================================
     # observation, truncated, info
@@ -308,19 +311,22 @@ class Level5Environment(Env):
         attitude = 3
         angular_rate = 3
         gun_state = 3
-
+        last_action_shape = 4
         inertial_data = position + velocity + attitude + angular_rate + gun_state
 
-        lidar_shape = rl_agent.lidar_shape
-        last_action_shape = 4
-
-        gun_state_shape = rl_agent.gun_state_shape
+        lidar = rl_agent.lidar
+        if isinstance(lidar, FusedLIDAR):
+            return {
+                "stacked_lidar": lidar.get_stacked_lidar_shape(),
+                "validity_mask": lidar.get_validity_mask_shape(),
+                "inertial_data": inertial_data,
+                "last_action": last_action_shape,
+            }
 
         return {
-            "lidar": lidar_shape,
+            "lidar": rl_agent.lidar_shape,
             "inertial_data": inertial_data,
             "last_action": last_action_shape,
-            # "gun": gun_state_shape,
         }
 
     ## Helpers #####################################################################

@@ -1,6 +1,7 @@
 import random
 from typing import Dict, List, Optional
 
+from core.dataclasses.message_context import MessageContext
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
 from core.entities.entity_type import EntityType
 from core.notification_system.topics_enum import TopicsEnum
@@ -109,27 +110,26 @@ class LiDARBufferManager:
     def buffer_message(
         self,
         message: Dict,
-        publisher_id: int,
+        message_context: MessageContext,
         topic: TopicsEnum,
-        step: int = -1
     ) -> None:
         """
         Buffers a message into the appropriate snapshot.
         Registers entity_type if it's a new publisher.
         """
-        entity_type = message.get("entity_type")
+        entity_type = message_context.entity_type
 
         # Try to fallback to already known entity type
         if entity_type is None:
-            entity_type = self.publisher_entity_map.get(publisher_id)
+            entity_type = self.publisher_entity_map.get(message_context.publisher_id)
 
         # If we still don't know the entity type, we can't proceed
         if entity_type is None:
-            print(f"[WARNING] Entity type missing for publisher {publisher_id}. Message discarded.")
+            print(f"[WARNING] Entity type missing for publisher {message_context.publisher_id}. Message discarded.")
             return
 
-        self._add_publisher(publisher_id, entity_type)
-
+        self._add_publisher(message_context.publisher_id, entity_type)
+        step = message_context.step if message_context.step is not None else -1
         if step < 0:
             step = self.current_step
 
@@ -137,10 +137,10 @@ class LiDARBufferManager:
         if delta_step < 0 or delta_step >= self.max_buffer_size:
             return
 
-        snapshot = self.buffer[publisher_id][delta_step]
+        snapshot = self.buffer[message_context.publisher_id][delta_step]
         if snapshot is None:
-            snapshot = PerceptionSnapshot(topics={}, publisher_id=publisher_id, step=step, entity_type=entity_type, max_delta_step=self.max_buffer_size)
-            self.buffer[publisher_id][delta_step] = snapshot
+            snapshot = PerceptionSnapshot(topics={}, publisher_id=message_context.publisher_id, step=step, entity_type=entity_type, max_delta_step=self.max_buffer_size)
+            self.buffer[message_context.publisher_id][delta_step] = snapshot
 
         snapshot.update(topic=topic, data=message)
 
