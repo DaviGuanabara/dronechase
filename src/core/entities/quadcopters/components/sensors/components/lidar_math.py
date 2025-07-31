@@ -27,7 +27,9 @@ class LidarMath:
         radius = np.sqrt(x**2 + y**2 + z**2)
         if radius == 0:
             return np.array([0.0, 0.0, 0.0])
-        theta = np.arccos(z / radius)
+        #theta = np.arccos(z / radius)
+        theta = np.arccos(np.clip(z / radius, -1.0, 1.0))
+
         phi = np.arctan2(y, x)
         return np.array([radius, theta, phi])
 
@@ -38,8 +40,56 @@ class LidarMath:
     
 
     @staticmethod
-    def reframe(cartesian: np.ndarray, frame: np.ndarray, new_frame: np.ndarray) -> np.ndarray:
-        return cartesian + frame - new_frame
+    def _invert_quaternion(quaternion: np.ndarray) -> np.ndarray:
+        """
+        Returns the normalized inverse of a quaternion (x, y, z, w).
+        """
+        norm_sq = np.dot(quaternion, quaternion)
+        if norm_sq == 0:
+            raise ValueError("Cannot invert zero-length quaternion.")
+        
+        # Conjugate: [x, y, z, w] → [-x, -y, -z, w]
+        conjugate = np.array([-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]])
+        
+        # Inverse = conjugate / norm²
+        return conjugate / norm_sq
+
+
+    def reframe(
+        self,
+        local_vector: np.ndarray,
+        neighbor_position: Optional[np.ndarray], neighbor_quaternion: Optional[np.ndarray],
+        agent_position: Optional[np.ndarray], agent_quaternion: Optional[np.ndarray]
+    ) -> Optional[np.ndarray]:
+        """
+        Transforms a point from a neighbor's local LiDAR frame into the agent's local frame.
+        Handles None positions and quaternions gracefully by returning None.
+
+        Returns:
+            A 3D point in the agent's local frame, or None if inputs are invalid.
+        """
+        import pybullet as p
+
+        if (
+            local_vector is None or
+            neighbor_position is None or agent_position is None or
+            neighbor_quaternion is None or agent_quaternion is None
+        ):
+            return None
+
+        global_vector = p.rotateVector(neighbor_quaternion, local_vector)
+        global_position = global_vector + neighbor_position
+
+        relative_to_agent = global_position - agent_position
+        agent_q_inverted = self._invert_quaternion(agent_quaternion)
+
+        agent_local_vector = p.rotateVector(agent_q_inverted, relative_to_agent)
+
+        return np.array(agent_local_vector)
+
+
+
+
 
     @staticmethod
     def index_from_radian(radian: float, min_angle: float, max_angle: float, n_points: int) -> int:
@@ -116,11 +166,20 @@ class LidarMath:
     # Feature Transformation
     # ----------------------------
 
+    def _rotate_by_quaternion(self, position: np.ndarray, quaternion: np.ndarray) -> np.ndarray:
+        """
+        Rotates a 3D position vector using a quaternion (w, x, y, z) in the PyBullet format.
+        This is done via conversion to rotation matrix.
+        """
+        import pybullet as p  # Safe to keep this inside the function if used only here
+        rotation_matrix = np.array(p.getMatrixFromQuaternion(quaternion)).reshape(3, 3)
+        return rotation_matrix @ position
+
+
     def transform_features(
         self,
-        neighbour_features: np.ndarray,
-        neighbour_position: np.ndarray,
-        agent_position: np.ndarray
+        neighbor: PerceptionSnapshot,
+        agent: PerceptionSnapshot
     ) -> List[Tuple[float, float, float, float, float]]:
 
         """
@@ -139,23 +198,34 @@ class LidarMath:
             List of features in agent frame: [normalized_r, theta (rad), phi (rad), entity_type, relative_step (0-1)]
         """
 
+        if neighbor.lidar_features is None:
+            return []
+
         transformed_features = []
-        for feature in neighbour_features:
+        for feature in neighbor.lidar_features:
             r, theta, phi, entity_type, relative_step = feature
             R = r * self.spec.max_radius
             # Convert to cartesian (spherical to cartesian)
             cartesian = self.spherical_to_cartesian(spherical=np.array((R, theta, phi)))
 
-            # Reframe neighbor to agent
-            cartesian_reframed = self.reframe(cartesian, neighbour_position, agent_position)
+            if neighbor.position is None or neighbor.quaternion is None or agent.position is None or agent.quaternion is None:
+                continue
+
+            reframed = self.reframe(
+                cartesian,
+                neighbor.position, neighbor.quaternion,
+                agent.position, agent.quaternion
+            )
+
+            if reframed is None:
+                continue
 
             # Convert back to spherical
-            spherical_agent = self.cartesian_to_spherical(cartesian_reframed)
-            R_from_agent = spherical_agent[0]
-            R = self.normalize_distance(R_from_agent)
+            spherical = self.cartesian_to_spherical(reframed)
+            normalized_sphercial = self.normalize_spherical(spherical)
             
             # Keep temporal info
-            transformed_features.append([R, *spherical_agent[1:], entity_type, relative_step])
+            transformed_features.append([*normalized_sphercial, entity_type, relative_step])
 
         return transformed_features
 
@@ -210,20 +280,21 @@ class LidarMath:
         - A new sphere aligned to the agent's spatial frame with the neighbor’s observations embedded.
         """
 
-        if not neighbor.sphere or not neighbor.position: 
+        if neighbor.sphere is None or neighbor.position is None: 
             return None
         
-        if not agent.position: 
+        if agent.position is None: 
             return None
 
-        temporal_sphere = neighbor.build_temporal_sphere(agent.step)
-        features_extracted = self.extract_features(temporal_sphere)
+        features_extracted = neighbor.lidar_features
+        #temporal_sphere = neighbor.build_temporal_sphere(agent.step)
+        #features_extracted = self.extract_features(temporal_sphere)
 
         #Ok - transform features to agent's frame
-        transformed_features = self.transform_features(
-            features_extracted,
-            neighbor.position,
-            agent.position)
+        if features_extracted is None:
+            return self.create_sphere(np.asarray([]))
+
+        transformed_features = self.transform_features(neighbor, agent)
 
         #time_channel = sphere_agent.shape[0]  # Assume next available channel
         #OK

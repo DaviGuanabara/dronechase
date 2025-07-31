@@ -34,6 +34,11 @@ class PerceptionSnapshot():
         lidar = self.lidar
         return lidar.get("sphere") if lidar and "sphere" in lidar else None
     
+    @property
+    def lidar_features(self) -> Optional[np.ndarray]:
+        lidar = self.lidar
+        return lidar.get("features") if lidar and "sphere" in lidar else None
+    
     def build_temporal_sphere(self, current_absolute_step: int) -> Optional[np.ndarray]:
         """
         Returns a LiDAR sphere with an added time channel representing delta_step,
@@ -46,8 +51,8 @@ class PerceptionSnapshot():
         sphere_raw = self.sphere
         n_channels, n_theta, n_phi = sphere_raw.shape
 
-        if n_channels != 2:
-            raise ValueError(f"Expected 2 channels (distance, flag), got {n_channels}")
+        if n_channels != 3:
+            raise ValueError(f"Expected 3 channels (distance, flag, time), got {n_channels}")
 
         t_sphere = np.zeros((TEMPORAL_N_CHANNELS, n_theta, n_phi), dtype=sphere_raw.dtype)
         t_sphere[LidarChannels.distance.value] = sphere_raw[LidarChannels.distance.value]

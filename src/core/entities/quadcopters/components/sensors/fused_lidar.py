@@ -85,9 +85,11 @@ class FusedLIDAR(BaseLidar):
         
 
         if agent is None or agent.sphere is None:
+            print(f"[DEBUG] [{self.parent_id}] agent is None ? {agent is None}; And agent.sphere is None ?")
             return []
 
         neighborhood: List[PerceptionSnapshot] = self.bootstrap()
+        print(f"[DEBUG] neighborhood len: {len(neighborhood)}")
         sphere_stack: List[np.ndarray] = [agent.sphere]
 
         for neighbor in neighborhood:
@@ -124,69 +126,92 @@ class FusedLIDAR(BaseLidar):
             if latest.position is not None and np.linalg.norm(latest.position - agent_snapshot.position) <= self.lidar_spec.max_radius
         ]
 
-    
-    
-    
-
 
     
     def update_data(self):
         """
-        Update the fused LiDAR data by retrieving the latest snapshots from the buffer manager.
-        This method retrieves the latest snapshots, extracts features from them, reframes their positions,
-        and combines them into a new unique temporal sphere that is then published."""
-        # retrieve last positions and entity types from all publishers, excluding agent
-        
-        print(f"Retrieving snapshots by distance for FusedLIDAR with parent_id {self.parent_id}")
-        snapshots = self.get_snapshots_by_distance()
-        print(f"[DEBUG] FusedLIDAR: {len(snapshots)} snapshots retrieved for fusion.")
+        Synthesizes the LiDAR sphere of the current agent by converting known positions
+        (from agent and allies) into spherical features and discretizing them.
+
+        This is a simulated LiDAR. Instead of casting rays, we directly project
+        known entity positions into the agent’s local frame and update the LiDAR grid.
+
+        The result is saved to:
+            - self.sphere: Discretized LiDAR sphere (C, θ, φ)
+            - self.features: List of [r_norm, θ, φ, entity_type, delta_step]
+        """
         agent = self.get_agent_snapshot()
 
-        if agent is None or agent.position is None:
+        if agent is None or agent.position is None or agent.quaternion is None:
+            print(f"[FusedLIDAR {self.parent_id}] Agent snapshot incomplete. Skipping update.")
             return
 
+        snapshots = self.get_snapshots_by_distance()
+        print(f"[FusedLIDAR {self.parent_id}] Retrieved {len(snapshots)} positions for synthetic LiDAR projection.")
+
         features = []
-        for snapshot in snapshots:
-            if snapshot.position is None:
+
+        for entity in snapshots:
+            if entity.position is None or entity.quaternion is None:
                 continue
 
-            # reframe
-            #TODO: HUGE PROBLEM HERE. 
-            #SNAPSHOT CONTAINS THE LIDAR, THAT I NEED TO EXTRACT THE FEATURES FROM THE SPHERE.
-            # THEN EACH FEATURE SHOULD BE REFRAMED, NORMALIZED, ETC.
-            print(f"[DEBUG] FusedLIDAR: Reframing snapshot position: {snapshot.position}")
-            #TODO: I NEED TO COUNT WITH THE ROTATION, BY USING QUATERNION.
-            reframed_snapshot_position = self.math.reframe(snapshot.position, np.zeros(3), agent.position)
-            spherical = self.math.cartesian_to_spherical(reframed_snapshot_position)
-            spherical = self.math.normalize_spherical(spherical)
-            # the lidars data are always
-            # from the loyal wingman.
-           
-            delta_step = 0 #current delta step
-            # mount features
-            features.append((*spherical, snapshot.entity_type, delta_step))
-            print(f"[DEBUG] FusedLIDAR: Feature added: {features[-1]}")
+            # Convert entity's position into agent’s local frame
+            relative_vector = self.math.reframe(
+                local_vector=np.zeros(3),  # reference point is the entity origin
+                neighbor_position=entity.position,
+                neighbor_quaternion=entity.quaternion,
+                agent_position=agent.position,
+                agent_quaternion=agent.quaternion,
+            )
 
-        new_sphere = self.lidar_spec.empty_sphere()
-        self.sphere = self.math.add_features(new_sphere, features)
-        self.buffer_manager.buffer_message_directly({"lidar": self.sphere, "step": self.buffer_manager.current_step}, self.parent_id, TopicsEnum.LIDAR_DATA_BROADCAST)
+            if relative_vector is None:
+                continue
+            spherical = self.math.cartesian_to_spherical(relative_vector)
+            normalized = self.math.normalize_spherical(spherical)
+
+            delta_step = 0  # Fresh synthetic projection (no lag)
+
+            feature = (*normalized, entity.entity_type, delta_step)
+            features.append(feature)
+
+            print(f"[DEBUG] FusedLIDAR {self.parent_id}: Added synthetic echo: {feature}")
+
+        # Fill the sphere with the synthetic features
+        self.features = features
+        self.sphere = self.math.add_features(self.lidar_spec.empty_sphere(), features)
+
+        # Share the data
+        self.buffer_manager.buffer_message_directly(
+            {
+                "sphere": self.sphere,
+                "step": self.buffer_manager.current_step,
+                "features": self.features,
+            },
+            self.parent_id,
+            TopicsEnum.LIDAR_DATA_BROADCAST,
+        )
+
+        print(f"[FusedLIDAR {self.parent_id}] Synthetic LiDAR update complete. {len(self.features)} features projected.")
+
 
 
 
     def read_data(self) -> Dict:
         if not self.activate_fusion:
-            return {"lidar": self.sphere}
+            return {"sphere": self.sphere, "features": self.features}
         
         self.buffer_manager.print_buffer_status()
         self.sphere_stack = self._build_valid_spheres()
+        print(f"[DEBUG] stacked sphere len {len(self.sphere_stack)}")
         padded_stack, mask = self._pad_sphere_stack(self.sphere_stack)
+        print(f"[DEBUG] padded stack len {len(padded_stack)}, mask len: {len(mask)}")
         #TODO: REMOVE THE PRINT
         #print({"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask})
         print(
             f"[DEBUG] valid_spheres count: {len(self.sphere_stack)} / expected: {self.n_neighbors_max + 1}")
         print(f"[DEBUG] padded_stack shape: {padded_stack.shape}, mask shape: {mask.shape}, mask: {mask}")
 
-        return {"lidar": self.sphere, "stacked_lidar": padded_stack, "validity_mask": mask}
+        return {"sphere": self.sphere, "stacked_spheres": padded_stack, "validity_mask": mask}
 
     def reset(self):
         pass
@@ -251,3 +276,48 @@ class FusedLIDAR(BaseLidar):
     def enable_fusion(self):
         self.activate_fusion = True
         print("Fused lidar activated")
+
+    def render_lidar_debug_rays(self):
+        """
+        Renders debug lines from the agent's current position to each non-empty LiDAR voxel
+        using the internal `self.sphere`. Only distances < 1.0 are rendered.
+        """
+        if self.sphere is None:
+            print("[DEBUG] No sphere data to render.")
+            return
+
+        position = self.parent_inertia.get("position")
+        if position is None:
+            print("[DEBUG] Agent position unavailable.")
+            return
+
+        theta_count = self.lidar_spec.n_theta_points
+        phi_count = self.lidar_spec.n_phi_points
+        max_distance = self.lidar_spec.max_radius
+
+        for theta_idx in range(theta_count):
+            for phi_idx in range(phi_count):
+                norm_dist = self.sphere[LidarChannels.distance.value][theta_idx][phi_idx]
+                if norm_dist >= 1.0:
+                    continue  # Skip empty readings
+
+                # Convert normalized distance back to real-world distance
+                dist = norm_dist * max_distance
+
+                # Convert to world Cartesian position
+                direction = self.math.spherical_to_cartesian(
+                    np.array([dist,
+                            self.math.theta_radian_from_index(theta_idx),
+                            self.math.phi_radian_from_index(phi_idx)])
+                )
+                end_position = np.array(position) + direction
+
+                # Draw line
+                p.addUserDebugLine(
+                    lineFromXYZ=position,
+                    lineToXYZ=end_position,
+                    lineColorRGB=[1, 0, 0],
+                    lineWidth=2,
+                    lifeTime=1.0,
+                    physicsClientId=self.client_id
+                )

@@ -36,6 +36,21 @@ class BaseLidar(Sensor):
         self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10)
         
     def buffer_lidar_data(self, message: Dict, message_context: MessageContext):
+        """
+        Buffers LiDAR broadcast data.
+        
+        Automatically removes derived tensor fields (`sphere`, `stacked_spheres`)
+        to enforce single-agent data ownership and avoid memory bloat.
+        """
+
+        if "features" not in message:
+            if self.debug:
+                print(f"[WARNING] Received LIDAR broadcast without features. Ignoring. Publisher: {message_context.publisher_id}")
+            return
+
+        # Defensive cleanup: remove large tensors before storing
+        message.pop("sphere", None)
+        message.pop("stacked_spheres", None)
         topic: TopicsEnum = TopicsEnum.LIDAR_DATA_BROADCAST
         self._buffer_data(message, message_context, topic)
 
