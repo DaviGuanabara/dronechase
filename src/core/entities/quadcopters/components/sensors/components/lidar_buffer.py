@@ -15,6 +15,8 @@ class LiDARBufferManager:
         self.max_buffer_size = max_buffer_size
         self.current_step = current_step
 
+        self.FRESHEST_DELTA_STEP = 1
+
     def _add_publisher(self, publisher_id: int, entity_type: EntityType) -> None:
         if publisher_id not in self.buffer:
             self.buffer[publisher_id] = [None] * self.max_buffer_size
@@ -207,7 +209,7 @@ class LiDARBufferManager:
 
     def get_latest_snapshot(self, publisher_id: int) -> Optional[PerceptionSnapshot]:
         """Get the latest snapshot for a specific publisher at the current step."""
-        return self._get_snapshot(publisher_id, self.current_step)
+        return self._get_snapshot(publisher_id, self.current_step - 1)
 
 
     def get_latest_neighborhood(self, exclude_publisher_id: int) -> List[PerceptionSnapshot]:
@@ -217,7 +219,7 @@ class LiDARBufferManager:
         """
         return self.retrieve_snapshots(
             entity_type=EntityType.LOYALWINGMAN,
-            delta_step=0,
+            delta_step=self.FRESHEST_DELTA_STEP,
             exclude_publisher_id=exclude_publisher_id
         )
 
@@ -228,13 +230,17 @@ class LiDARBufferManager:
         """
         return self.retrieve_snapshots(
             entity_type=EntityType.LOITERINGMUNITION,
-            delta_step=0
+            delta_step=self.FRESHEST_DELTA_STEP
         )
 
     def get_latests(self, exclude_publisher_id:Optional[int]=None):
+        """
+        The latest stable reading that reflects the world after the previous update cycle.
+        maybe, There should be a (little) discrepancy between the real state and the extract state.
+        """
         return self.retrieve_snapshots(
             entity_type=None,
-            delta_step=0,
+            delta_step=self.FRESHEST_DELTA_STEP,
             exclude_publisher_id=exclude_publisher_id
         )
     
@@ -259,7 +265,7 @@ class LiDARBufferManager:
         snapshots = self.retrieve_snapshots(
             topic=topic,
             entity_type=entity_type,
-            delta_step=0,
+            delta_step=self.FRESHEST_DELTA_STEP,
             exclude_publisher_id=exclude_publisher_id
         )
 
@@ -269,4 +275,24 @@ class LiDARBufferManager:
             if topic in snapshot.topics
         }
 
+    def print_buffer_status(self) -> None:
+        print("\n📦 LiDARBufferManager Status Snapshot:")
+        print(f"  ➤ Current Step: {self.current_step}")
+        print(f"  ➤ Max Buffer Size: {self.max_buffer_size}\n")
+        print(f"  ➤ Using freshest snapshot at Δ={self.FRESHEST_DELTA_STEP}")
 
+        for publisher_id, snapshots in self.buffer.items():
+            entity = self.publisher_entity_map.get(publisher_id, "UNKNOWN")
+            valid_snapshots = [s for s in snapshots if s is not None]
+            print(
+                f"🛰️  Publisher ID: {publisher_id} | Entity: {entity} | Valid Snapshots: {len(valid_snapshots)}")
+
+            for i, snapshot in enumerate(snapshots):
+                if snapshot is None:
+                    print(f"   └─ [Δ={i}] ⛔ Empty")
+                else:
+                    step_info = f"Step: {snapshot.step}" if snapshot.step is not None else "No Step"
+                    topic_list = ", ".join(
+                        t.name for t in snapshot.topics.keys()) if snapshot.topics else "No Topics"
+                    print(f"   └─ [Δ={i}] ✅ {step_info} | Topics: {topic_list}")
+            print()

@@ -221,20 +221,29 @@ class Level5Environment(Env):
         The RL AGENT PERSUER is the source of the observation.
         """
 
-        rl_agent: Quadcopter = self.entities_manager.get_agent()
+        #TODO: Here is updating the lidar. but is updating only for the agent.
+        # I need to update the lidar for all loyal wingman.
+        for pursuer in self.entities_manager.get_all_pursuers():
+            pursuer.update_lidar()
 
-        rl_agent.update_lidar()
-
+        #rl_agent.update_lidar()
+        rl_agent = self.entities_manager.get_agent()
         inertial_data: np.ndarray = self.process_inertial_state(rl_agent)
-        rl_agent.lidar_data
+        #rl_agent.lidar_data
 
-        lidar: np.ndarray = rl_agent.lidar_data.get(
-            "lidar",
+        #rl_agent.lidar_data
+        stacked_lidar: np.ndarray = rl_agent.lidar_data.get(
+            "stacked_lidar",
             np.zeros(
-                rl_agent.lidar_shape,
+                rl_agent.lidar_shape, #TODO: POSSIBLY, IT WILL BROKE, IF STACKED LIDAR DOES NOT EXIST IN A FUSED LIDAR.
                 dtype=np.float32,
             ),
         )
+
+        validity_mask: np.ndarray = rl_agent.lidar_data.get("validity_mask", np.zeros(
+            # TODO: IT WILL BROKE, IF STACKED LIDAR DOES NOT EXIST IN A FUSED LIDAR.
+            rl_agent.lidar_shape, dtype=np.float32
+        ))
 
         gun_state = rl_agent.gun_state
 
@@ -243,7 +252,8 @@ class Level5Environment(Env):
         )
 
         return {
-            "lidar": lidar.astype(np.float32),
+            "stacked_lidar": stacked_lidar.astype(np.float32),
+            "validity_mask": validity_mask.astype(np.float32),
             # inertial_data.astype(np.float32),
             "inertial_data": inertial_gun_concat,
             "last_action": self.last_action.astype(np.float32),

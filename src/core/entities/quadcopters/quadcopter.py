@@ -246,6 +246,8 @@ class Quadcopter:
 
 
     def _publish_lidar_data(self, message: Dict):
+        print(f"Publishing lidar data for Quadcopter {self.id} on topic {TopicsEnum.LIDAR_DATA_BROADCAST.name}")
+        
         self._publish(topic=TopicsEnum.LIDAR_DATA_BROADCAST, message=message)
 
     def _publish_inertial_data(self):
@@ -303,6 +305,8 @@ class Quadcopter:
 
     def update_lidar(self):
         # print("updating lidar")
+        if self.quadcopter_type == EntityType.LOYALWINGMAN:
+            print(f"[DEBUG] LoyalWingman {self.id}: Should update its LiDAR data. Lidar is {'on' if self.lidar_on else 'off'}")
         if self.lidar_on:
    
             self.lidar.update_data()
