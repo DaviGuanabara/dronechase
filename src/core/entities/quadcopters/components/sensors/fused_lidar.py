@@ -1,10 +1,12 @@
 
+import itertools
 from typing import List, Tuple, Union
 from typing import Dict, List, Tuple
 from core.dataclasses.perception_snapshot import PerceptionSnapshot
+from core.enums.channel_index import LidarChannels
 from core.notification_system.topics_enum import TopicsEnum
 from core.entities.quadcopters.components.sensors.interfaces.base_lidar import BaseLidar
-
+import pybullet as p
 
 
 import numpy as np
@@ -211,6 +213,7 @@ class FusedLIDAR(BaseLidar):
             f"[DEBUG] valid_spheres count: {len(self.sphere_stack)} / expected: {self.n_neighbors_max + 1}")
         print(f"[DEBUG] padded_stack shape: {padded_stack.shape}, mask shape: {mask.shape}, mask: {mask}")
 
+        self.render_lidar_debug_rays()
         return {"sphere": self.sphere, "stacked_spheres": padded_stack, "validity_mask": mask}
 
     def reset(self):
@@ -285,8 +288,11 @@ class FusedLIDAR(BaseLidar):
         if self.sphere is None:
             print("[DEBUG] No sphere data to render.")
             return
-
-        position = self.parent_inertia.get("position")
+        agent = self.get_agent_snapshot()
+        if agent is None:
+            return
+        position = agent.position
+        #position = self.parent_inertia.get("position")
         if position is None:
             print("[DEBUG] Agent position unavailable.")
             return
@@ -295,29 +301,28 @@ class FusedLIDAR(BaseLidar):
         phi_count = self.lidar_spec.n_phi_points
         max_distance = self.lidar_spec.max_radius
 
-        for theta_idx in range(theta_count):
-            for phi_idx in range(phi_count):
-                norm_dist = self.sphere[LidarChannels.distance.value][theta_idx][phi_idx]
-                if norm_dist >= 1.0:
-                    continue  # Skip empty readings
+        for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
+            norm_dist = self.sphere[LidarChannels.distance.value][theta_idx][phi_idx]
+            if norm_dist >= 1.0:
+                continue  # Skip empty readings
 
-                # Convert normalized distance back to real-world distance
-                dist = norm_dist * max_distance
+            # Convert normalized distance back to real-world distance
+            dist = norm_dist * max_distance
 
-                # Convert to world Cartesian position
-                direction = self.math.spherical_to_cartesian(
-                    np.array([dist,
-                            self.math.theta_radian_from_index(theta_idx),
-                            self.math.phi_radian_from_index(phi_idx)])
-                )
-                end_position = np.array(position) + direction
+            # Convert to world Cartesian position
+            direction = self.math.spherical_to_cartesian(
+                np.array([dist,
+                        self.math.theta_radian_from_index(theta_idx),
+                        self.math.phi_radian_from_index(phi_idx)])
+            )
+            end_position = np.array(position) + direction
 
-                # Draw line
-                p.addUserDebugLine(
-                    lineFromXYZ=position,
-                    lineToXYZ=end_position,
-                    lineColorRGB=[1, 0, 0],
-                    lineWidth=2,
-                    lifeTime=1.0,
-                    physicsClientId=self.client_id
-                )
+            # Draw line
+            p.addUserDebugLine(
+                lineFromXYZ=position,
+                lineToXYZ=end_position,
+                lineColorRGB=[1, 0, 0],
+                lineWidth=2,
+                lifeTime=1.0,
+                physicsClientId=self.client_id
+            )
