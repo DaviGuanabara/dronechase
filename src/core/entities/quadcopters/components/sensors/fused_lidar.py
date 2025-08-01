@@ -63,7 +63,8 @@ class FusedLIDAR(BaseLidar):
         debug: bool = False,
         activate_fusion: bool = False,
     ):
-        super().__init__(parent_id, client_id, debug, radius, resolution, n_neighbors_min, n_neighbors_max)
+        super().__init__(parent_id, client_id, debug, radius,
+                         resolution, n_neighbors_min, n_neighbors_max)
         print("Fused Lidar created")
         self.activate_fusion: bool = False
 
@@ -114,8 +115,12 @@ class FusedLIDAR(BaseLidar):
         if agent_snapshot is None or agent_snapshot.position is None:
             return []
         
-        latests: List[PerceptionSnapshot] = self.buffer_manager.get_latest_neighborhood(
-            exclude_publisher_id=self.parent_id)
+        #TODO: Here gets only allies, not all entities.
+        # This is a problem, because I want to get all entities.
+
+        latests: List[PerceptionSnapshot] = self.buffer_manager.get_latests(self.parent_id)
+        #latests: List[PerceptionSnapshot] = self.buffer_manager.get_latest_neighborhood(
+         #   exclude_publisher_id=self.parent_id)
         latests.append(agent_snapshot)
         
         #print(f"[DEBUG] FusedLIDAR: Agent snapshot: {agent_snapshot}")
@@ -159,7 +164,8 @@ class FusedLIDAR(BaseLidar):
 
             # Convert entity's position into agent’s local frame
             relative_vector = self.math.reframe(
-                local_vector=np.zeros(3),  # reference point is the entity origin
+                # reference point is the entity origin
+                local_vector=np.zeros(3),
                 neighbor_position=entity.position,
                 neighbor_quaternion=entity.quaternion,
                 agent_position=agent.position,

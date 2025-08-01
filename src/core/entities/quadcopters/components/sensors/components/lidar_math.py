@@ -32,11 +32,6 @@ class LidarMath:
 
         phi = np.arctan2(y, x)
         return np.array([radius, theta, phi])
-
-    @staticmethod
-    def normalize_angle(angle: float, initial: float, final: float, n_points: int) -> int:
-        """Converte ângulo contínuo em ponto discreto com wrap-around."""
-        return round((angle - initial) / (final - initial) * n_points) % n_points
     
 
     @staticmethod
@@ -90,34 +85,45 @@ class LidarMath:
 
 
 
+    #TODO: OVERFLOW AND UNDERFLOW HANDLING
+    #@staticmethod
+    #def index_from_radian(radian: float, min_angle: float, max_angle: float, n_points: int) -> int:
+    #    return round((radian - min_angle) / (max_angle - min_angle) * n_points) % n_points
 
     @staticmethod
     def index_from_radian(radian: float, min_angle: float, max_angle: float, n_points: int) -> int:
-        return round((radian - min_angle) / (max_angle - min_angle) * n_points) % n_points
+        index = int((radian - min_angle) / (max_angle - min_angle) * n_points)
+        return np.clip(index, 0, n_points - 1)
 
-    @staticmethod
-    def radian_from_index(index: int, min_angle: float, max_angle: float, n_points: int) -> float:
-        return (index / n_points) * (max_angle - min_angle) + min_angle
+
+    #@staticmethod
+    #def radian_from_index(index: int, min_angle: float, max_angle: float, n_points: int) -> float:
+    #    return (index / n_points) * (max_angle - min_angle) + min_angle
     
     def theta_index_from_radian(self, radian: float) -> int:
         return self.index_from_radian(radian, self.spec.theta_initial_radian, self.spec.theta_final_radian, self.spec.n_theta_points)
 
+    @staticmethod
+    def radian_from_index(index: int, min_angle: float, max_angle: float, n_points: int) -> float:
+        return ((index + 0.5) / n_points) * (max_angle - min_angle) + min_angle
+
+
+    def theta_radian_from_index(self, index: int) -> float:
+        return self.radian_from_index(index, self.spec.theta_initial_radian, self.spec.theta_final_radian, self.spec.n_theta_points)
+
+
+    def phi_radian_from_index(self, index: int) -> float:
+        return self.radian_from_index(index, self.spec.phi_initial_radian, self.spec.phi_final_radian, self.spec.n_phi_points)
+
+
     def phi_index_from_radian(self, radian: float) -> int:
         return self.index_from_radian(radian, self.spec.phi_initial_radian, self.spec.phi_final_radian, self.spec.n_phi_points)
 
-    def theta_radian_from_index(self, index: int) -> float:
-        return self.index_from_radian(index, self.spec.theta_initial_radian, self.spec.theta_final_radian, self.spec.n_theta_points)
+    #def theta_radian_from_index(self, index: int) -> float:
+    #    return self.index_from_radian(index, self.spec.theta_initial_radian, self.spec.theta_final_radian, self.spec.n_theta_points)
 
-    def phi_radian_from_index(self, index: int) -> float:
-        return self.index_from_radian(index, self.spec.phi_initial_radian, self.spec.phi_final_radian, self.spec.n_phi_points)
-
-    def normalize_theta(self, theta: float) -> int:
-        return self.normalize_angle(theta, self.spec.theta_initial_radian, self.spec.theta_final_radian, self.spec.n_theta_points)
-
-
-    def normalize_phi(self, phi: float) -> int:
-        return self.normalize_angle(phi, self.spec.phi_initial_radian, self.spec.phi_final_radian, self.spec.n_phi_points)
-
+    #def phi_radian_from_index(self, index: int) -> float:
+    #   return self.index_from_radian(index, self.spec.phi_initial_radian, self.spec.phi_final_radian, self.spec.n_phi_points)
 
     def normalize_distance(self, distance: float) -> float:
         return np.clip(distance / self.spec.max_radius, 0, 1)
@@ -128,9 +134,7 @@ class LidarMath:
 
         distance, theta, phi = spherical
         norm_distance = self.normalize_distance(distance)
-        theta_point = self.normalize_theta(theta)
-        phi_point = self.normalize_phi(phi)
-        return norm_distance, theta_point, phi_point
+        return norm_distance, theta, phi
 
 
 

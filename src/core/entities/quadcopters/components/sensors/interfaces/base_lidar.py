@@ -18,6 +18,10 @@ from core.entities.quadcopters.components.sensors.components.lidar_math import L
 class BaseLidar(Sensor):
     
     def __init__(self, parent_id, client_id, debug = False, radius: float = 1.0, resolution: float = 1.0, n_neighbors_min: int = 1, n_neighbors_max: int = 10):
+        """
+        theta = 0 to pi
+        phi = -pi to pi
+        """
         
         self.parent_id = parent_id
         self.client_id = client_id
