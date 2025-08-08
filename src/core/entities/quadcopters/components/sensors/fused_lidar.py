@@ -93,7 +93,7 @@ class FusedLIDAR(BaseLidar):
 
         neighborhood: List[PerceptionSnapshot] = self.bootstrap()
         print(f"[DEBUG] neighborhood len: {len(neighborhood)}")
-        sphere_stack: List[np.ndarray] = [agent.sphere]
+        sphere_stack: List[np.ndarray] = [agent.sphere] #Buffer only keeps agents sphere
 
         for neighbor in neighborhood:
             neighbor_sphere_reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, agent=agent)
@@ -211,16 +211,17 @@ class FusedLIDAR(BaseLidar):
         self.buffer_manager.print_buffer_status()
         self.sphere_stack = self._build_valid_spheres()
         print(f"[DEBUG] stacked sphere len {len(self.sphere_stack)}")
-        padded_stack, mask = self._pad_sphere_stack(self.sphere_stack)
-        print(f"[DEBUG] padded stack len {len(padded_stack)}, mask len: {len(mask)}")
+        self.padded_stack, self.mask = self._pad_sphere_stack(self.sphere_stack)
+        print(f"[DEBUG] padded stack len {len(self.padded_stack)}, mask len: {len(self.mask)}")
         #TODO: REMOVE THE PRINT
         #print({"lidar": self.sphere, "fused_lidar": padded_stack, "mask": mask})
         print(
             f"[DEBUG] valid_spheres count: {len(self.sphere_stack)} / expected: {self.n_neighbors_max + 1}")
-        print(f"[DEBUG] padded_stack shape: {padded_stack.shape}, mask shape: {mask.shape}, mask: {mask}")
+        print(f"[DEBUG] padded_stack shape: {self.padded_stack.shape}, mask shape: {self.mask.shape}, mask: {self.mask}")
 
-        self.render_lidar_debug_rays()
-        return {"sphere": self.sphere, "stacked_spheres": padded_stack, "validity_mask": mask}
+        #self.render_lidar_debug_rays()
+        self.render_random_stacked_lidar_debug_rays()
+        return {"sphere": self.sphere, "features": self.features, "stacked_spheres": self.padded_stack, "validity_mask": self.mask}
 
     def reset(self):
         pass
@@ -330,5 +331,69 @@ class FusedLIDAR(BaseLidar):
                 lineColorRGB=[1, 0, 0],
                 lineWidth=2,
                 lifeTime=1.0,
+                physicsClientId=self.client_id
+            )
+
+    def render_random_stacked_lidar_debug_rays(self):
+        """
+        Render LiDAR rays from a random stacked sphere (already reframed),
+        drawn from the agent's position using a unique color.
+        """
+        if not hasattr(self, 'padded_stack') or self.sphere_stack is None:
+            print("[DEBUG] No padded_stack available.")
+            return
+
+        if len(self.sphere_stack) < 3:
+            print("[DEBUG] Empty padded_stack.")
+            return
+
+        # Select a random index
+        target_idx = random.randint(1, len(self.sphere_stack) - 1)
+
+        agent = self.get_agent_snapshot()
+        if agent is None or agent.position is None:
+            print("[DEBUG] Agent snapshot or position unavailable.")
+            return
+
+        position = agent.position
+        theta_count = self.lidar_spec.n_theta_points
+        phi_count = self.lidar_spec.n_phi_points
+        max_distance = self.lidar_spec.max_radius
+
+        colors = [
+            [1, 0, 0],  # red
+            [0, 1, 0],  # green
+            [0, 0, 1],  # blue
+            [1, 1, 0],  # yellow
+            [0, 1, 1],  # cyan
+            [1, 0, 1],  # magenta
+        ]
+
+        sphere = self.sphere_stack[target_idx]
+        color = colors[target_idx % len(colors)]
+        print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
+
+        for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
+            norm_dist = sphere[LidarChannels.distance.value][theta_idx][phi_idx]
+            if norm_dist >= 1.0:
+                continue
+
+            dist = norm_dist * max_distance
+            direction = self.math.spherical_to_cartesian(
+                np.array([
+                    dist,
+                    self.math.theta_radian_from_index(theta_idx),
+                    self.math.phi_radian_from_index(phi_idx)
+                ])
+            )
+
+            end_position = np.array(agent.position) + direction
+
+            p.addUserDebugLine(
+                lineFromXYZ=position,
+                lineToXYZ=end_position,
+                lineColorRGB=color,
+                lineWidth=2,
+                lifeTime=1,
                 physicsClientId=self.client_id
             )

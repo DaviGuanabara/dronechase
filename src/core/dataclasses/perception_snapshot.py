@@ -32,12 +32,12 @@ class PerceptionSnapshot():
     @property
     def sphere(self) -> Optional[np.ndarray]:
         lidar = self.lidar
-        return lidar.get("sphere") if lidar and "sphere" in lidar else None
+        return lidar.get("sphere") if lidar else None
     
     @property
     def lidar_features(self) -> Optional[np.ndarray]:
         lidar = self.lidar
-        return lidar.get("features") if lidar and "sphere" in lidar else None
+        return lidar.get("features") if lidar else None
     
     def build_temporal_sphere(self, current_absolute_step: int) -> Optional[np.ndarray]:
         """

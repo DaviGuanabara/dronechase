@@ -284,7 +284,7 @@ class LidarMath:
         - A new sphere aligned to the agent's spatial frame with the neighbor’s observations embedded.
         """
 
-        if neighbor.sphere is None or neighbor.position is None: 
+        if neighbor.lidar_features is None or neighbor.position is None: 
             return None
         
         if agent.position is None: 
@@ -297,6 +297,9 @@ class LidarMath:
         #Ok - transform features to agent's frame
         if features_extracted is None:
             return self.create_sphere(np.asarray([]))
+        print(f"[DEBUG] Reframing neighbor {neighbor.publisher_id}")
+        print(f"    Neighbor position: {neighbor.position}, quaternion: {neighbor.quaternion}")
+        print(f"    Agent position:    {agent.position}, quaternion:    {agent.quaternion}")
 
         transformed_features = self.transform_features(neighbor, agent)
 
