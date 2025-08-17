@@ -8,7 +8,7 @@ from core.notification_system.topics_enum import TopicsEnum
 
 
 class LiDARBufferManager:
-    def __init__(self, current_step=0, max_buffer_size: int = 1):
+    def __init__(self, current_step=0, max_buffer_size: int = 1, verbose:bool = False):
 
         self.buffer: Dict[int, List[Optional[PerceptionSnapshot]]] = {}
         self.publisher_entity_map: Dict[int, EntityType] = {}
@@ -16,6 +16,7 @@ class LiDARBufferManager:
         self.current_step = current_step
 
         self.FRESHEST_DELTA_STEP = 1
+        self.verbose = verbose
 
     def _add_publisher(self, publisher_id: int, entity_type: EntityType) -> None:
         if publisher_id not in self.buffer:
@@ -146,7 +147,8 @@ class LiDARBufferManager:
 
         # If we still don't know the entity type, we can't proceed
         if entity_type is None:
-            print(f"[WARNING] Entity type missing for publisher {message_context.publisher_id}. Message discarded.")
+            if self.verbose:
+                print(f"[WARNING] Entity type missing for publisher {message_context.publisher_id}. Message discarded.")
             return
 
         self._add_publisher(message_context.publisher_id, entity_type)
@@ -205,7 +207,8 @@ class LiDARBufferManager:
     def get_random_neighborhood(self, n_neighbors: int, exclude_publisher_id: int) -> List[PerceptionSnapshot]:
 
         random_publisher_ids = self._random_publisher_id(exclude_publisher_id, quantity=n_neighbors, entity_type=EntityType.LOYALWINGMAN)
-        return self.retrieve_snapshots(publisher_ids=random_publisher_ids, delta_step=None)
+        print(f"random publisher ids: {random_publisher_ids}, excluded id: {exclude_publisher_id}")
+        return self.retrieve_snapshots(publisher_ids=random_publisher_ids, delta_step=None, exclude_publisher_id=exclude_publisher_id)
 
     def get_latest_snapshot(self, publisher_id: int) -> Optional[PerceptionSnapshot]:
         """Get the latest snapshot for a specific publisher at the current step."""

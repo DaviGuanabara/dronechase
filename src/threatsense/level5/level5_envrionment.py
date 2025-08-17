@@ -63,8 +63,8 @@ class Level5Environment(Env):
         self.setup_static_entities()
 
         # self.step_counter = 0
-        self.task_progression.on_env_init()
-        self.task_progression.on_episode_start()
+        #self.task_progression.on_env_init()
+        #self.task_progression.on_episode_start()
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
 
@@ -95,6 +95,15 @@ class Level5Environment(Env):
         self.last_action = np.zeros(4)
         self.step_counter = 0
 
+    def init_task_progression(self):
+        self.task_progression = TaskProgression(
+            TasksDispatcher.level5_tasks(
+                self.dome_radius, self.entities_manager)
+        )
+
+        self.task_progression.on_env_init()
+        self.task_progression.on_episode_start()
+
     def init_components(self, dome_radius, GUI):
 
         print("Level 5 Environment - init components")
@@ -106,10 +115,12 @@ class Level5Environment(Env):
         self.entities_manager.setup_debug(self.debug_on)
 
         print("task progression init - Level 5 Environment")
-        self.task_progression = TaskProgression(
-            TasksDispatcher.level5_tasks(
-                self.dome_radius, self.entities_manager)
-        )
+
+        self.init_task_progression()
+        #self.task_progression = TaskProgression(
+        #    TasksDispatcher.level5_tasks(
+        #        self.dome_radius, self.entities_manager)
+        #)
 
         self.setup_messange_hub()
 

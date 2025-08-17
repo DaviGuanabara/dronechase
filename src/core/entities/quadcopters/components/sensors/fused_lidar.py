@@ -63,6 +63,7 @@ class FusedLIDAR(BaseLidar):
         debug: bool = False,
         activate_fusion: bool = False,
     ):
+        #TODO: DEBUG AND VERBOSE -> SAME
         super().__init__(parent_id, client_id, debug, radius,
                          resolution, n_neighbors_min, n_neighbors_max)
         print("Fused Lidar created")
@@ -72,31 +73,34 @@ class FusedLIDAR(BaseLidar):
     def bootstrap(self) -> List[PerceptionSnapshot]:
 
         n = random.choice(range(self.n_neighbors_min, self.n_neighbors_max))
-        return self.buffer_manager.get_random_neighborhood(
+        neighborhood = self.buffer_manager.get_random_neighborhood(
             n_neighbors=n, exclude_publisher_id=self.parent_id
         )
+        if len(neighborhood) > 0:
+            print(f"[DEBUG] neighborhood: {neighborhood[0].publisher_id} - {neighborhood[0].step} - {neighborhood[0].position}")
+        return neighborhood
 
     def _build_valid_spheres(self) -> List[np.ndarray]:
         """
-        first is agent sphere, then neighbors spheres.
-        Returns a list of spheres, where the first element is the agent's sphere
+        first is returned its own sphere, then neighbors spheres.
+        Returns a list of spheres, where the first element is its own sphere
         shape is (N, C, θ, φ) where N = 1 + max_neighbors
         and C, θ, φ are defined by the LIDARSpec.
         """
 
-        agent = self.buffer_manager.get_latest_snapshot(self.parent_id)
-        
+        own_drone = self.buffer_manager.get_latest_snapshot(self.parent_id)
 
-        if agent is None or agent.sphere is None:
-            print(f"[DEBUG] [{self.parent_id}] agent is None ? {agent is None}; And agent.sphere is None ?")
+        if own_drone is None or own_drone.sphere is None:
+            print(f"[DEBUG] [{self.parent_id}] own_drone is None ? {own_drone is None};")
             return []
 
         neighborhood: List[PerceptionSnapshot] = self.bootstrap()
         print(f"[DEBUG] neighborhood len: {len(neighborhood)}")
-        sphere_stack: List[np.ndarray] = [agent.sphere] #Buffer only keeps agents sphere
+        sphere_stack: List[np.ndarray] = [own_drone.sphere] #Buffer only keeps agents sphere
 
         for neighbor in neighborhood:
-            neighbor_sphere_reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, agent=agent)
+            #TODO: VERIFY NEIGHBOR SPHERE FROM NEW FRAME
+            neighbor_sphere_reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, own=own_drone)
 
             if neighbor_sphere_reframed is not None:
                 sphere_stack.append(neighbor_sphere_reframed)
@@ -105,14 +109,12 @@ class FusedLIDAR(BaseLidar):
 
     def get_snapshots_by_distance(self) -> List[PerceptionSnapshot]:
         """
-        Return threats (LOITERINGMUNITION) within the max LiDAR radius.
+        Return entities detected within the max LiDAR radius.
         """
-        #TODO: GET THE NEIGHBORS FROM THE BUFFER MANAGER.
-        #WHERE IS THE OTHERS SNAPSHOTS NEIGHBORS ? I HVAVE TO GET THEM FROM THE BUFFER MANAGER.
-        #latests = self.buffer_manager.get_latests(self.parent_id)
-        #max_radius: float = self.lidar_spec.max_radius
-        agent_snapshot = self.get_agent_snapshot()
-        if agent_snapshot is None or agent_snapshot.position is None:
+
+        own_drone_snapshot = self.get_own_snapshot()
+
+        if own_drone_snapshot is None or own_drone_snapshot.position is None:
             return []
         
         #TODO: Here gets only allies, not all entities.
@@ -121,46 +123,57 @@ class FusedLIDAR(BaseLidar):
         latests: List[PerceptionSnapshot] = self.buffer_manager.get_latests(self.parent_id)
         #latests: List[PerceptionSnapshot] = self.buffer_manager.get_latest_neighborhood(
          #   exclude_publisher_id=self.parent_id)
-        latests.append(agent_snapshot)
+
+         #TODO: precisa mesmo adicionar o agente?
+        #latests.append(agent_snapshot)
         
         #print(f"[DEBUG] FusedLIDAR: Agent snapshot: {agent_snapshot}")
         
 
         #agent_pos = agent_snapshot.position
-
-        return [
-            latest for latest in latests
-            if latest.position is not None and np.linalg.norm(latest.position - agent_snapshot.position) <= self.lidar_spec.max_radius
-        ]
+        return latests
+        #return [
+        #    latest for latest in latests
+        #    if latest.position is not None and np.linalg.norm(latest.position - agent_snapshot.position) <= self.lidar_spec.max_radius
+        #]
 
 
     
     def update_data(self):
         """
-        Synthesizes the LiDAR sphere of the current agent by converting known positions
-        (from agent and allies) into spherical features and discretizing them.
+        Synthesizes the LiDAR sphere of its own_drone by converting known positions
+        (from own_drone and allies) into spherical features and discretizing them.
 
         This is a simulated LiDAR. Instead of casting rays, we directly project
-        known entity positions into the agent’s local frame and update the LiDAR grid.
+        known entity positions into the own_drone’s local frame and update the LiDAR grid.
 
         The result is saved to:
             - self.sphere: Discretized LiDAR sphere (C, θ, φ)
             - self.features: List of [r_norm, θ, φ, entity_type, delta_step]
         """
-        agent = self.get_agent_snapshot()
+        own_drone = self.get_own_snapshot()
+        print(f"[FusedLIDAR {self.parent_id}] Starting synthetic LiDAR update.")
 
-        if agent is None or agent.position is None or agent.quaternion is None:
-            print(f"[FusedLIDAR {self.parent_id}] Agent snapshot incomplete. Skipping update.")
+        if own_drone is None or own_drone.position is None or own_drone.quaternion is None:
+            print(f"[FusedLIDAR {self.parent_id}] own_drone snapshot incomplete. Skipping update.")
             return
 
         snapshots = self.get_snapshots_by_distance()
         print(f"[FusedLIDAR {self.parent_id}] Retrieved {len(snapshots)} positions for synthetic LiDAR projection.")
 
-        features = []
+        raw_features = []
 
         for entity in snapshots:
             if entity.position is None or entity.quaternion is None:
                 continue
+            
+            #TODO: Não está fazendo o efeito esperado, de remover a autovisualização.
+            #rever essa lógica
+            #REALMENTE, O QUE É QUE EU ADICIONO SINTETICAMENTE O AGENT FEATURES NO SNAPSHOTS BY DISTANxCE
+            # EU REALMENTE NÃO LEMBRO O MOTIVO, PARECE QUE NÃO HÁ UM.
+            if entity.publisher_id == self.parent_id:
+                print("READING OF ITSELF REMOVED")
+                continue  # Skip synthetic echo of self from neighbor
 
             # Convert entity's position into agent’s local frame
             relative_vector = self.math.reframe(
@@ -168,8 +181,8 @@ class FusedLIDAR(BaseLidar):
                 local_vector=np.zeros(3),
                 neighbor_position=entity.position,
                 neighbor_quaternion=entity.quaternion,
-                agent_position=agent.position,
-                agent_quaternion=agent.quaternion,
+                own_position=own_drone.position,
+                own_quaternion=own_drone.quaternion,
             )
 
             if relative_vector is None:
@@ -177,16 +190,19 @@ class FusedLIDAR(BaseLidar):
             spherical = self.math.cartesian_to_spherical(relative_vector)
             normalized = self.math.normalize_spherical(spherical)
 
+            #TODO: EU TÔ ACHANDO QUE ESSA LÓGICA DE ENFICAR O DELTA_sTEP NO FEATURES TÁ QUEBRADO.
             delta_step = 0  # Fresh synthetic projection (no lag)
 
-            feature = (*normalized, entity.entity_type, delta_step)
-            features.append(feature)
+            feature = (*normalized, entity.entity_type, delta_step, entity.publisher_id)
+            raw_features.append(feature)
 
-            print(f"[DEBUG] FusedLIDAR {self.parent_id}: Added synthetic echo: {feature}")
+            
 
         # Fill the sphere with the synthetic features
-        self.features = features
-        self.sphere = self.math.add_features(self.lidar_spec.empty_sphere(), features)
+        self.sphere, self.features = self.math.add_features(self.lidar_spec.empty_sphere(), raw_features)
+        for feature in self.features:
+            print(
+                f"[DEBUG] FusedLIDAR {self.parent_id}: Added synthetic echo: {feature}")
 
         # Share the data
         self.buffer_manager.buffer_message_directly(
@@ -200,15 +216,17 @@ class FusedLIDAR(BaseLidar):
         )
 
         print(f"[FusedLIDAR {self.parent_id}] Synthetic LiDAR update complete. {len(self.features)} features projected.")
+        print()
 
 
 
 
     def read_data(self) -> Dict:
+        self.render_lidar_debug_rays()
         if not self.activate_fusion:
             return {"sphere": self.sphere, "features": self.features}
         
-        self.buffer_manager.print_buffer_status()
+        #self.buffer_manager.print_buffer_status()
         self.sphere_stack = self._build_valid_spheres()
         print(f"[DEBUG] stacked sphere len {len(self.sphere_stack)}")
         self.padded_stack, self.mask = self._pad_sphere_stack(self.sphere_stack)
@@ -287,90 +305,120 @@ class FusedLIDAR(BaseLidar):
         self.activate_fusion = True
         print("Fused lidar activated")
 
-    def render_lidar_debug_rays(self):
-        """
-        Renders debug lines from the agent's current position to each non-empty LiDAR voxel
-        using the internal `self.sphere`. Only distances < 1.0 are rendered.
-        """
-        if self.sphere is None:
-            print("[DEBUG] No sphere data to render.")
-            return
-        agent = self.get_agent_snapshot()
-        if agent is None:
-            return
-        position = agent.position
-        #position = self.parent_inertia.get("position")
-        if position is None:
-            print("[DEBUG] Agent position unavailable.")
-            return
-
-        theta_count = self.lidar_spec.n_theta_points
-        phi_count = self.lidar_spec.n_phi_points
-        max_distance = self.lidar_spec.max_radius
-
-        for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
-            norm_dist = self.sphere[LidarChannels.distance.value][theta_idx][phi_idx]
-            if norm_dist >= 1.0:
-                continue  # Skip empty readings
-
-            # Convert normalized distance back to real-world distance
-            dist = norm_dist * max_distance
-
-            # Convert to world Cartesian position
-            direction = self.math.spherical_to_cartesian(
-                np.array([dist,
-                        self.math.theta_radian_from_index(theta_idx),
-                        self.math.phi_radian_from_index(phi_idx)])
-            )
-            end_position = np.array(position) + direction
-
-            # Draw line
-            p.addUserDebugLine(
-                lineFromXYZ=position,
-                lineToXYZ=end_position,
-                lineColorRGB=[1, 0, 0],
-                lineWidth=2,
-                lifeTime=1.0,
-                physicsClientId=self.client_id
-            )
-
     def render_random_stacked_lidar_debug_rays(self):
         """
         Render LiDAR rays from a random stacked sphere (already reframed),
-        drawn from the agent's position using a unique color.
+        drawn from the own_drone's position using a unique color.
         """
         if not hasattr(self, 'padded_stack') or self.sphere_stack is None:
             print("[DEBUG] No padded_stack available.")
             return
 
-        if len(self.sphere_stack) < 3:
+        if len(self.sphere_stack) < 2:
             print("[DEBUG] Empty padded_stack.")
             return
 
         # Select a random index
-        target_idx = random.randint(1, len(self.sphere_stack) - 1)
+        target_idx = 0 #random.randint(0, len(self.sphere_stack) - 1)
 
-        agent = self.get_agent_snapshot()
-        if agent is None or agent.position is None:
-            print("[DEBUG] Agent snapshot or position unavailable.")
+        own_drone = self.get_own_snapshot()
+        if own_drone is None or own_drone.position is None:
+            print("[DEBUG] own_drone snapshot or position unavailable.")
             return
 
-        position = agent.position
+
+        
+        position = own_drone.position
         theta_count = self.lidar_spec.n_theta_points
         phi_count = self.lidar_spec.n_phi_points
         max_distance = self.lidar_spec.max_radius
+        Green = [0, 1, 0, 1]
 
         colors = [
-            [1, 0, 0],  # red
             [0, 1, 0],  # green
+            [1, 0, 0],  # red
             [0, 0, 1],  # blue
-            [1, 1, 0],  # yellow
             [0, 1, 1],  # cyan
+            [1, 1, 0],  # yellow
             [1, 0, 1],  # magenta
+            
         ]
 
-        sphere = self.sphere_stack[target_idx]
+        if own_drone.sphere is not None:
+            are_equal = np.array_equal(own_drone.sphere, self.sphere_stack[0])
+            print(f"[DEBUG] self.sphere == sphere_stack[0]? {are_equal}")
+
+        
         color = colors[target_idx % len(colors)]
+        print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
+
+        for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
+            norm_dist = self.sphere_stack[1][LidarChannels.distance.value][theta_idx][phi_idx]
+            if norm_dist >= 1.0:
+                # REMOVE INVALID POSITIONS
+                continue
+
+            dist = norm_dist * max_distance
+            direction = self.math.spherical_to_cartesian(
+                np.array([
+                    dist,
+                    self.math.theta_radian_from_index(theta_idx),
+                    self.math.phi_radian_from_index(phi_idx)
+                ])
+            )
+
+            end_position = np.array(own_drone.position) + direction
+
+            p.addUserDebugLine(
+                lineFromXYZ=position,
+                lineToXYZ=end_position,
+                lineColorRGB=color,
+                lineWidth=2,
+                lifeTime=1,
+                physicsClientId=self.client_id
+            )
+
+    def render_lidar_debug_rays(self):
+        """
+        Render LiDAR rays from a random stacked sphere (already reframed),
+        drawn from the agent's position using a unique color.
+        """
+        print(f"[VISUALIZATION] Showing fused rays for loyalwingman {self.parent_id}")
+        #if self.parent_id == 12:
+        #    return
+        # Select a random index
+        target_idx = self.parent_id % 10
+        
+
+        own_drone = self.get_own_snapshot()
+        if own_drone is None or own_drone.position is None:
+            print("[DEBUG] Own drone snapshot or position unavailable.")
+            return
+
+        position = own_drone.position
+        theta_count = self.lidar_spec.n_theta_points
+        phi_count = self.lidar_spec.n_phi_points
+        max_distance = self.lidar_spec.max_radius
+        Green = [0, 1, 0, 1]
+
+        colors = [
+            [1, 1, 0],  # yellow
+            [0, 1, 0],  # green
+            [0, 0, 1],  # blue
+            
+            
+            [0, 1, 1],  # cyan
+            
+            [1, 0, 1],  # magenta
+            [1, 0, 0],  # red
+        ]
+
+        sphere = self.sphere
+        if sphere is None:
+            return
+        
+        color = colors[target_idx % len(colors)]
+        #print(f"Color choice: {color}")
         print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
 
         for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
@@ -387,7 +435,7 @@ class FusedLIDAR(BaseLidar):
                 ])
             )
 
-            end_position = np.array(agent.position) + direction
+            end_position = np.array(own_drone.position) + direction
 
             p.addUserDebugLine(
                 lineFromXYZ=position,

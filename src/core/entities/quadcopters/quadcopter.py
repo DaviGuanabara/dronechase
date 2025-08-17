@@ -92,8 +92,18 @@ class Quadcopter:
     def update_color(self):
         Red = [1, 0, 0, 1]
         LightRed = [1, 0.5, 0.5, 1]
+        
+        if self.is_agent:
+            if self.armed:
+                # Green for armed agent
+                Green = [0, 1, 0, 1]
+                p.changeVisualShape(self.id, -1, rgbaColor=Green)
 
-        if self.quadcopter_type == EntityType.LOYALWINGMAN:
+            else:
+                LightGreen = [0.5, 1, 0.5, 1]
+                p.changeVisualShape(self.id, -1, rgbaColor=LightGreen)
+
+        elif self.quadcopter_type == EntityType.LOYALWINGMAN:
             if self.armed:
                 DarkBlue = [0, 0, 0.8, 1]
                 p.changeVisualShape(
@@ -144,8 +154,9 @@ class Quadcopter:
         # print(f"Lidar Radius: {lidar_radius}")
         lidar_resolution = 16
 
-        lidar_class = FusedLIDAR if use_fused_lidar else LIDAR
-        lidar = lidar_class(quadx.Id, simulation._client, radius=lidar_radius,resolution=lidar_resolution,debug=debug_on)
+        #lidar_class = FusedLIDAR if use_fused_lidar else LIDAR
+        #lidar = lidar_class(quadx.Id, simulation._client, radius=lidar_radius,resolution=lidar_resolution,debug=debug_on)
+        lidar = FusedLIDAR(parent_id=quadx.Id, client_id=simulation._client, debug=debug_on, radius=lidar_radius, resolution=lidar_resolution)
 
 
 

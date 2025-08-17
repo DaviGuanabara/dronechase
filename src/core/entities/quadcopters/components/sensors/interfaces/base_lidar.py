@@ -17,7 +17,7 @@ from core.entities.quadcopters.components.sensors.components.lidar_math import L
 
 class BaseLidar(Sensor):
     
-    def __init__(self, parent_id, client_id, debug = False, radius: float = 1.0, resolution: float = 1.0, n_neighbors_min: int = 1, n_neighbors_max: int = 10):
+    def __init__(self, parent_id, client_id, debug = False, radius: float = 1.0, resolution: float = 1.0, n_neighbors_min: int = 1, n_neighbors_max: int = 10, verbose:bool = False):
         """
         theta = 0 to pi
         phi = -pi to pi
@@ -37,14 +37,15 @@ class BaseLidar(Sensor):
         self.math = LidarMath(self.lidar_spec)
     
         self.sphere: np.ndarray = self.lidar_spec.empty_sphere()
-        self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10)
+        self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10, verbose=verbose)
+        self.verbose = verbose
         
     def buffer_lidar_data(self, message: Dict, message_context: MessageContext):
         """
         Buffers LiDAR broadcast data.
         
         Automatically removes derived tensor fields (`sphere`, `stacked_spheres`)
-        to enforce single-agent data ownership and avoid memory bloat.
+        to enforce data ownership and avoid memory bloat.
         """
 
         if "features" not in message:
@@ -84,7 +85,7 @@ class BaseLidar(Sensor):
             self.lidar_spec.reset_sphere(self.sphere)
 
 
-    def get_agent_snapshot(self) -> Optional[PerceptionSnapshot]:
+    def get_own_snapshot(self) -> Optional[PerceptionSnapshot]:
         return self.buffer_manager.get_latest_snapshot(self.parent_id)
     
     @abstractmethod

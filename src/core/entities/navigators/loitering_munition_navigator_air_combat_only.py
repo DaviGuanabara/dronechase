@@ -66,6 +66,13 @@ class KamikazeNavigator(Navigator):
         # self.state = new_state
 
     def update(self, agent, offset_handler):
+        #TODO: Find a better name. Maybe, update_behavior
+
+        """
+        Update the behavior of the agent based on its current state and environment state
+        through entities position, given by <offset_handler>.
+        """
+
         state: State = self.fetch_state(agent)
         state.check_transition(agent, self, offset_handler)
         state.execute(agent, self, offset_handler)
