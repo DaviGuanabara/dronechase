@@ -39,7 +39,8 @@ class BaseLidar(Sensor):
         self.sphere: np.ndarray = self.lidar_spec.empty_sphere()
         self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=10, verbose=verbose)
         self.verbose = verbose
-        
+
+ 
     def buffer_lidar_data(self, message: Dict, message_context: MessageContext):
         """
         Buffers LiDAR broadcast data.
@@ -64,7 +65,7 @@ class BaseLidar(Sensor):
         self._buffer_data(message, message_context, topic)
 
     def buffer_step_broadcast(self, message: Dict, message_context: MessageContext):
-        self.buffer_manager.update_current_step(message.get("step", self.buffer_manager.current_step))
+        self.buffer_manager.update_current_step(message.get("step"))
 
 
     def _buffer_data(self, message: Dict, message_context: MessageContext, topic: TopicsEnum):

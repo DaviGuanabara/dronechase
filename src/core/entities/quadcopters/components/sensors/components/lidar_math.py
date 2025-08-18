@@ -218,7 +218,8 @@ class LidarMath:
             
             #TODO: É UMA TUPLA, NÃO OBJETO FEATURES. ENTÃO EU TENHO QUE 
             #ADICIONAR O ID NESSA TUPLA, NA QUARTA POSIÇÃO.
-            r, theta, phi, entity_type, relative_step, publisher_id = feature
+            #TODO: ESQUECER ESSE RELATIVE STEP, PQ ELE VAI ESTAR DESATUALIZADO.
+            r, theta, phi, entity_type, _, publisher_id = feature
             if publisher_id == own.publisher_id:
                print(
                    "[DEBUG] [LIDAR MATH] [transform_features] READING OF ITSELF REMOVED")
@@ -247,7 +248,10 @@ class LidarMath:
             normalized_spherical = self.normalize_spherical(spherical)
             
             # Keep temporal info
-            transformed_features.append([*normalized_spherical, entity_type, relative_step])
+            #ONCE THE SNAPSHOT is garthered, its normalized delta is updated
+            #therefore, considering no advance in step, it should be ok to use.
+            transformed_features.append(
+                [*normalized_spherical, entity_type, neighbor.normalized_delta])
 
         return transformed_features
 

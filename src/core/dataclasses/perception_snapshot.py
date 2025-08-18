@@ -12,14 +12,25 @@ from core.notification_system.topics_enum import TopicsEnum
 class PerceptionSnapshot():
     topics: Dict[TopicsEnum, Dict]
     publisher_id: int
-    step: int
+    step: int #absolute step
     entity_type: EntityType
-    max_delta_step: int
+    normalized_delta: Optional[float] = None  # será preenchido depois
 
+    def update_normalized_delta(self, current_absolute_step: int, max_delta_step: int) -> None:
+        """
+        Updates the normalized delta of this snapshot relative to the current step.
+        - 0.0 = freshest (just captured)
+        - 1.0 = oldest allowed by the buffer
 
-    def relative_step(self, current_absolute_step: int) -> float:
-        delta = (self.step - current_absolute_step) / self.max_delta_step
-        return np.clip(delta, 0.0, 1.0)
+        Parameters
+        ----------
+        current_absolute_step : int
+            The current global step (simulation time).
+        max_delta_step : int
+            Maximum step difference used for normalization.
+        """
+        delta = (current_absolute_step - self.step) / max_delta_step
+        self.normalized_delta = float(np.clip(delta, 0.0, 1.0))
 
     @property
     def imu(self) -> Optional[Dict]:
@@ -38,12 +49,13 @@ class PerceptionSnapshot():
     def lidar_features(self) -> Optional[np.ndarray]:
         lidar = self.lidar
         return lidar.get("features") if lidar else None
-    
-    def build_temporal_sphere(self, current_absolute_step: int) -> Optional[np.ndarray]:
-        """
-        Returns a LiDAR sphere with an added time channel representing delta_step,
-        calculated as (current_step - self.step).
-        """
+
+    """
+    def build_temporal_sphere(self, current_absolute_step: int, max_delta_step: int) -> Optional[np.ndarray]:
+    """
+    #Returns a LiDAR sphere with an added time channel representing delta_step,
+    #calculated as (current_step - self.step).
+    """
         if self.sphere is None:
             return None
 
@@ -58,11 +70,11 @@ class PerceptionSnapshot():
         t_sphere[LidarChannels.distance.value] = sphere_raw[LidarChannels.distance.value]
         t_sphere[LidarChannels.flag.value] = sphere_raw[LidarChannels.flag.value]
 
-        delta_step = self.relative_step(current_absolute_step)
+        delta_step = self.normalized_delta(current_absolute_step, max_delta_step)
         t_sphere[LidarChannels.time.value].fill(delta_step)
 
         return t_sphere
-
+    """
 
     
     def update(self, topic: TopicsEnum, data: Dict) -> None:

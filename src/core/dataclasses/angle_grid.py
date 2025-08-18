@@ -38,6 +38,9 @@ class LIDARSpec:
 
     @property
     def shape(self) -> Tuple[int, int, int]:
+        """
+        n channels is bigger in fused lidar than standard LIDAR class, to accomodate temporal stamping.
+        """
         return self.n_channels, self.n_theta_points, self.n_phi_points
 
     def stacked_sphere_shape(self, max_neighbors: int) -> Tuple[int, int, int, int]:
