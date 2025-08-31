@@ -257,7 +257,7 @@ class Quadcopter:
 
 
     def _publish_lidar_data(self, message: Dict):
-        print(f"Publishing lidar data for Quadcopter {self.id} on topic {TopicsEnum.LIDAR_DATA_BROADCAST.name}")
+        #print(f"Publishing lidar data for Quadcopter {self.id} on topic {TopicsEnum.LIDAR_DATA_BROADCAST.name}")
         
         self._publish(topic=TopicsEnum.LIDAR_DATA_BROADCAST, message=message)
 
@@ -316,8 +316,8 @@ class Quadcopter:
 
     def update_lidar(self):
         # print("updating lidar")
-        if self.quadcopter_type == EntityType.LOYALWINGMAN:
-            print(f"[DEBUG] LoyalWingman {self.id}: Should update its LiDAR data. Lidar is {'on' if self.lidar_on else 'off'}")
+        #if self.quadcopter_type == EntityType.LOYALWINGMAN:
+            #print(f"[DEBUG] LoyalWingman {self.id}: Should update its LiDAR data. Lidar is {'on' if self.lidar_on else 'off'}")
         if self.lidar_on:
    
             self.lidar.update_data()
@@ -593,8 +593,8 @@ class Quadcopter:
         Marks this quadcopter as the agent.
         It updates internal components accordingly (e.g., LiDAR fusion).
         """
-        print("drone set as agent")
-        print(f"lidar is Fused ? {isinstance(self.lidar, FusedLIDAR)}")
+        #print("drone set as agent")
+        #print(f"lidar is Fused ? {isinstance(self.lidar, FusedLIDAR)}")
         if isinstance(self.lidar, FusedLIDAR):
             #TODO: IN MAINTANANCE
             self.lidar.enable_fusion()

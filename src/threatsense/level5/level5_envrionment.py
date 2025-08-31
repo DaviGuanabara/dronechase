@@ -166,6 +166,8 @@ class Level5Environment(Env):
 
         observation = self.compute_observation()
         info = self.compute_info()
+
+        print("Level 5 Environment - reset done")
         return observation, info
 
     # TODO: I have to work on this method.
@@ -243,18 +245,11 @@ class Level5Environment(Env):
         #rl_agent.lidar_data
 
         #rl_agent.lidar_data
-        stacked_lidar: np.ndarray = rl_agent.lidar_data.get(
-            "stacked_lidar",
-            np.zeros(
-                rl_agent.lidar_shape, #TODO: POSSIBLY, IT WILL BROKE, IF STACKED LIDAR DOES NOT EXIST IN A FUSED LIDAR.
-                dtype=np.float32,
-            ),
-        )
 
-        validity_mask: np.ndarray = rl_agent.lidar_data.get("validity_mask", np.zeros(
-            # TODO: IT WILL BROKE, IF STACKED LIDAR DOES NOT EXIST IN A FUSED LIDAR.
-            rl_agent.lidar_shape, dtype=np.float32
-        ))
+        #O BUG ESTÁ AQUI. ELE 
+        #lidar = rl_agent.lidar_data.get("lidar", None)
+        stacked_spheres = rl_agent.lidar_data.get("stacked_spheres", None)
+        validity_mask = rl_agent.lidar_data.get("validity_mask", None)
 
         gun_state = rl_agent.gun_state
 
@@ -262,9 +257,17 @@ class Level5Environment(Env):
             np.float32
         )
 
+        #assert lidar is not None, "Lidar data is None"
+        assert stacked_spheres is not None, "Stacked spheres data is None"
+        assert validity_mask is not None, "Validity mask data is None"
+
+        #print(f"[DEBUG] Level5Environment compute_observation -> mask {validity_mask}")
+        #print(f"[DEBUG] Level5Environment compute_observation -> stacked_spheres shape: {stacked_spheres.shape}, validity_mask shape: {validity_mask.shape}")
         return {
-            "stacked_lidar": stacked_lidar.astype(np.float32),
-            "validity_mask": validity_mask.astype(np.float32),
+            "stacked_spheres": stacked_spheres.astype(np.float32),
+            # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
+            "lidar": np.zeros((2, 13, 26), dtype=np.float32),
+            "validity_mask": validity_mask.astype(bool),
             # inertial_data.astype(np.float32),
             "inertial_data": inertial_gun_concat,
             "last_action": self.last_action.astype(np.float32),
@@ -294,18 +297,19 @@ class Level5Environment(Env):
         observation_shape = self.observation_shape()
         return spaces.Dict(
             {
-                "stacked_lidar": spaces.Box(
+                "stacked_spheres": spaces.Box(
                     0,
                     1,
-                    shape=observation_shape["stacked_lidar"],
+                    shape=observation_shape["stacked_spheres"],
                     dtype=np.float32,
                 ),
-                "validity_mask": spaces.Box(
+                "lidar": spaces.Box(
                     0,
                     1,
-                    shape=observation_shape["validity_mask"],
+                    shape=(2, 13, 26),   # 🔑 mantém shape antigo
                     dtype=np.float32,
-                ),
+                ),  # spaces.Box(0, 1, shape=observation_shape["lidar"], dtype=np.float32), #só por compatibilidade mesmo
+                "validity_mask": spaces.MultiBinary(observation_shape["validity_mask"]),
                 "inertial_data": spaces.Box(
                     -np.ones((observation_shape["inertial_data"],)),
                     np.ones((observation_shape["inertial_data"],)),
@@ -341,7 +345,8 @@ class Level5Environment(Env):
             assert False, "Lidar should be FusedLIDAR"
         #if isinstance(lidar, FusedLIDAR):
         return {
-            "stacked_lidar": lidar.get_stacked_lidar_shape(),
+            "stacked_spheres": lidar.get_stacked_lidar_shape(),
+            #"lidar": lidar.get_data_shape(), #só por compatibilidade mesmo
             "validity_mask": lidar.get_validity_mask_shape(),
             "inertial_data": inertial_data,
             "last_action": last_action_shape,

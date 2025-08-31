@@ -4,6 +4,8 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 import math
 import random
+
+
 from ...task_progression import TaskStatus, Task
 
 from ....entities_management.entities_manager import EntitiesManager, Quadcopter

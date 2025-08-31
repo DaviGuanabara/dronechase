@@ -203,6 +203,10 @@ class LidarMath:
 
         Returns:
             List of features in own frame: [normalized_r, theta (rad), phi (rad), entity_type, relative_step (0-1)]
+
+        Note:
+        - Most probable feature delta_step info is outdated, as it is can be kept saved for long time ago.
+        |-> It is recommended to ignore it and use directly from snapshot (that is updated on retrieval).
         """
 
         if neighbor.lidar_features is None:
@@ -212,8 +216,8 @@ class LidarMath:
         for feature in neighbor.lidar_features:
 
             if neighbor.position is None or neighbor.quaternion is None or own.position is None or own.quaternion is None:
-                print(
-                    "[WARNING] Missing position or quaternion for transformation. Skipping feature.")
+                #print(
+                #    "[WARNING] Missing position or quaternion for transformation. Skipping feature.")
                 continue
             
             #TODO: É UMA TUPLA, NÃO OBJETO FEATURES. ENTÃO EU TENHO QUE 
@@ -221,8 +225,8 @@ class LidarMath:
             #TODO: ESQUECER ESSE RELATIVE STEP, PQ ELE VAI ESTAR DESATUALIZADO.
             r, theta, phi, entity_type, _, publisher_id = feature
             if publisher_id == own.publisher_id:
-               print(
-                   "[DEBUG] [LIDAR MATH] [transform_features] READING OF ITSELF REMOVED")
+               #print(
+               #    "[DEBUG] [LIDAR MATH] [transform_features] READING OF ITSELF REMOVED")
                continue  # Skip synthetic echo of self from neighbor
             
             #if LidarMath._is_self_echo(publisher_id, own.publisher_id):
@@ -296,7 +300,7 @@ class LidarMath:
             #if feature_distance < current_distance:
             if self.decide_feature_overwrite(current_distance, feature_distance, invert_prioritization_criteria):
 
-                print(f"[DEBUG] trocando {current_distance} por {feature_distance}")
+                #print(f"[DEBUG] trocando {current_distance} por {feature_distance}")
                 sphere[LidarChannels.distance.value][theta_idx][phi_idx] = feature_distance
                 sphere[LidarChannels.flag.value][theta_idx][phi_idx] = entity_type.value / 5 if isinstance(
                     entity_type, EntityType) else entity_type
@@ -337,9 +341,9 @@ class LidarMath:
         if own.position is None: 
             return None
 
-        print(f"[DEBUG] Reframing neighbor {neighbor.publisher_id}")
-        print(f"    Neighbor position: {neighbor.position}, quaternion: {neighbor.quaternion}")
-        print(f"    Own position:    {own.position}, quaternion:    {own.quaternion}")
+        #print(f"[DEBUG] Reframing neighbor {neighbor.publisher_id}")
+        #print(f"    Neighbor position: {neighbor.position}, quaternion: {neighbor.quaternion}")
+        #print(f"    Own position:    {own.position}, quaternion:    {own.quaternion}")
 
         transformed_features = self.transform_features(neighbor, own)
 

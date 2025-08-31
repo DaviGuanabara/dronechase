@@ -6,20 +6,23 @@ from gymnasium import spaces, Env
 from pynput.keyboard import Key, KeyCode
 from collections import defaultdict
 
-from .components.simulation.level4_simulation import L4AviarySimulation
-from .components.entities_management.entities_manager import (
+
+from threatengage.environments.level4.components.simulation.level4_simulation import L4AviarySimulation
+#from .components.simulation.level4_simulation import L4AviarySimulation
+from threatengage.environments.level4.components.entities_management.entities_manager import (
     EntitiesManager,
     Quadcopter,
 )
 
-from .components.tasks_management.task_progression import TaskProgression
-from .components.tasks_management.tasks_dispatcher import TasksDispatcher
+from threatengage.environments.level4.components.tasks_management.task_progression import TaskProgression
+from threatengage.environments.level4.components.tasks_management.tasks_dispatcher import TasksDispatcher
 
-from .components.utils.normalization import normalize_inertial_data
+from threatengage.environments.level4.components.utils.normalization import normalize_inertial_data
+
 
 
 # from .components.tasks_management.stages import L3Stage1 as Stage1
-from core.notification_system.message_hub import MessageHub
+from core.notification_system.message_hub import MessageHub, MessageContext
 
 
 class Exp03vFinalEnvironment(Env):
@@ -175,7 +178,7 @@ class Exp03vFinalEnvironment(Env):
         self.message_hub.publish(
             TopicsEnum.AGENT_STEP_BROADCAST,
             {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
-            0,
+            MessageContext(publisher_id=0, step=self.step_counter, entity_type=None),
         )
 
     # ====================================================================================================

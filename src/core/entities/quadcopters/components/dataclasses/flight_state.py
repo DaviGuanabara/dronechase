@@ -59,7 +59,12 @@ class FlightStateManager:
 
     def get_lidar_data(self) -> Dict[str, Any]:
         """Retrieve data related to the lidar."""
-        lidar_keys = ["lidar"]
+        #TODO: ADICIONAR OS OUTROS DADOS DO LIDAR
+        #TODO: Essa classe tá uma bosta.
+        #raise ValueError("Update this method to match the new lidar data structure.")
+        
+        lidar_keys = ["lidar", "sphere", "features",
+                                  "stacked_spheres", "validity_mask"]
         return self.get_data(lidar_keys) or {key: None for key in lidar_keys}
 
     def get_data_by_type(

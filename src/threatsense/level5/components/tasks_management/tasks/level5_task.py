@@ -94,8 +94,8 @@ class Level5_Task(Task):
             self.NUM_PURSUERS, self.MUNITION_PER_DEFENDER, self.NUM_INVADERS)
         # Número de inimigos pode ser arbitrário (ex: para gerar oclusão, complexidade)
 
-        print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
-        print(f"[INIT] NUM_INVADERS: {self.NUM_INVADERS}")
+        #print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
+        #print(f"[INIT] NUM_INVADERS: {self.NUM_INVADERS}")
 
     def init_globals(self):
         self.current_step = 0
@@ -669,12 +669,10 @@ class Level5_Task(Task):
         pursuers = agent + allies
 
         for pursuer in pursuers:
-            print(
-                f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
+            #print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
             pursuer.set_munition(self.MUNITION_PER_DEFENDER)
 
-        print(
-            f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
+        #print(f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
 
         self.entities_manager.set_agent()
 

@@ -12,7 +12,7 @@ from threatengage.environments.level4.components.tasks_management.tasks.exp02_v4
     Exp02_V4_Single_air_combat_only_Task,
 )
 
-from threatengage.environments.level4.components.tasks_management.tasks.legacy.exp021_task import Exp021_Task
+#from threatengage.environments.level4.components.tasks_management.tasks.legacy.exp021_task import Exp021_Task
 from threatengage.environments.level4.components.tasks_management.tasks.exp03_cooperative_only_task import Exp03_Cooperative_Only_Task
 from threatengage.environments.level4.components.tasks_management.tasks.exp04_cooperative_only_coop_bt_stopped_task import (
     Exp04_Cooperative_Only_BT_Stopped_Task,
@@ -50,9 +50,9 @@ class TasksDispatcher:
     def exp02_v2_full(dome_radius, quadcopter_manager) -> "list[Task]":
         return [Exp02_V2_Full_Task(quadcopter_manager, dome_radius)]
 
-    @staticmethod
-    def exp021(dome_radius, quadcopter_manager) -> "list[Task]":
-        return [Exp021_Task(quadcopter_manager, dome_radius)]
+    #@staticmethod
+    #def exp021(dome_radius, quadcopter_manager) -> "list[Task]":
+    #    return [Exp021_Task(quadcopter_manager, dome_radius)]
 
     @staticmethod
     def exp02_v3(dome_radius, quadcopter_manager) -> "list[Task]":

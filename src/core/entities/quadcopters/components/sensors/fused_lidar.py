@@ -66,7 +66,7 @@ class FusedLIDAR(BaseLidar):
         #TODO: DEBUG AND VERBOSE -> SAME
         super().__init__(parent_id, client_id, debug, radius,
                          resolution, n_neighbors_min, n_neighbors_max)
-        print("Fused Lidar created")
+        #print("Fused Lidar created")
         self.activate_fusion: bool = False
 
 
@@ -76,8 +76,8 @@ class FusedLIDAR(BaseLidar):
         """
         n = random.choice(range(self.n_neighbors_min, self.n_neighbors_max))
         neighborhood = self.buffer_manager.get_random_neighborhood(n_neighbors=n )  # , exclude_publisher_id=self.parent_id
-        if len(neighborhood) > 0:
-            print(f"[DEBUG] neighborhood: {neighborhood[0].publisher_id} - {neighborhood[0].step} - {neighborhood[0].position}")
+        #if len(neighborhood) > 0:
+        #    print(f"[DEBUG] neighborhood: {neighborhood[0].publisher_id} - {neighborhood[0].step} - {neighborhood[0].position}")
         return neighborhood
 
     def _build_valid_spheres(self) -> List[np.ndarray]:
@@ -91,16 +91,16 @@ class FusedLIDAR(BaseLidar):
         own_drone = self.buffer_manager.get_latest_snapshot(self.parent_id)
 
         if own_drone is None or own_drone.sphere is None:
-            print(f"[DEBUG] [{self.parent_id}] own_drone is None ? {own_drone is None};")
-            print(own_drone)
+            #print(f"[DEBUG] [{self.parent_id}] own_drone is None ? {own_drone is None};")
+            #print(own_drone)
             return []
 
         neighborhood: List[PerceptionSnapshot] = self.bootstrap()
-        print(f"[DEBUG] neighborhood len: {len(neighborhood)}")
+        #print(f"[DEBUG] neighborhood len: {len(neighborhood)}")
         sphere_stack: List[np.ndarray] = [own_drone.sphere] #Buffer only keeps agents sphere
 
         for neighbor in neighborhood:
-            #TODO: VERIFY NEIGHBOR SPHERE FROM NEW FRAME
+            
             neighbor_sphere_reframed = self.math.neighbor_sphere_from_new_frame(neighbor=neighbor, own=own_drone)
 
             if neighbor_sphere_reframed is not None:
@@ -151,19 +151,22 @@ class FusedLIDAR(BaseLidar):
         The result is saved to:
             - self.sphere: Discretized LiDAR sphere (C, θ, φ)
             - self.features: List of [r_norm, θ, φ, entity_type, delta_step]
+
+        It is important to note that the delta_step is calculated based on the current
+        time step. As the simulation progresses, the delta_step inserted in the feature
+        will become outdated. So, should we be caution about it. 
+        TODO: Should I remove the delta_step from the features?
         """
         own_drone = self.get_own_snapshot()
         #print(f"[FusedLIDAR {self.parent_id}] Starting synthetic LiDAR update.")
 
         if own_drone is None or own_drone.position is None or own_drone.quaternion is None:
-            print(f"[FusedLIDAR {self.parent_id}] own_drone snapshot incomplete. Skipping update.")
+            #print(f"[FusedLIDAR {self.parent_id}] own_drone snapshot incomplete. Skipping update.")
             self.features = []
             return
 
-        #snapshots = self.get_snapshots_by_distance()
         snapshots: List[PerceptionSnapshot] = self.buffer_manager.get_latests(
             self.parent_id)
-        #print(f"[FusedLIDAR {self.parent_id}] Retrieved {len(snapshots)} positions for synthetic LiDAR projection.")
 
         raw_features = []
 
@@ -171,13 +174,11 @@ class FusedLIDAR(BaseLidar):
             if snap.position is None or snap.quaternion is None:
                 continue
             
-            #TODO: Não está fazendo o efeito esperado, de remover a autovisualização.
-            #rever essa lógica
-            #REALMENTE, O QUE É QUE EU ADICIONO SINTETICAMENTE O AGENT FEATURES NO SNAPSHOTS BY DISTANxCE
-            # EU REALMENTE NÃO LEMBRO O MOTIVO, PARECE QUE NÃO HÁ UM.
+            # Skip synthetic echo of self from neighbors
+            # self visualization
             if snap.publisher_id == self.parent_id:
-                print("READING OF ITSELF REMOVED")
-                continue  # Skip synthetic echo of self from neighbor
+                #print("READING OF ITSELF REMOVED")
+                continue  
 
             # Convert entity's position into agent’s local frame
             relative_vector = self.math.reframe(
@@ -194,22 +195,18 @@ class FusedLIDAR(BaseLidar):
             spherical = self.math.cartesian_to_spherical(relative_vector)
             normalized = self.math.normalize_spherical(spherical)
 
-            #TODO: EU TÔ ACHANDO QUE ESSA LÓGICA DE ENFICAR O DELTA_STEP NO FEATURES TÁ QUEBRADO.
-            delta_step = snap.normalized_delta  # 0  # Fresh synthetic projection (no lag)
-            #TODO: ESSE DELTA STEP AQUI É UM PROBLEMA, PQ ELE DEVE MUDAR CONFORME O TEMPO PASSA.
+            #TODO: This delta step logic is broken, because once the time passes, the step difference increases
+            # and the data becomes useless.
+            delta_step = snap.normalized_delta  
             feature = (*normalized, snap.entity_type, delta_step, snap.publisher_id)
             raw_features.append(feature)
 
         
         # Fill the sphere with the synthetic features
         self.sphere, self.features = self.math.add_features(self.lidar_spec.empty_sphere(), raw_features)
-        #for feature in self.features:
-        #    print(
-        #        f"[DEBUG] FusedLIDAR {self.parent_id}: Added synthetic echo: {feature}")
 
-        # Share the data
-
-        #print(f"[DEBUG] FusedLIDAR UPDATE DATA {self.sphere}: sphere builded.")
+        #It saves in 1 step behind, because is the step where it were collected the IMU data to build the sphere
+        #TODO: refactor this call to BaseLidar
         self.buffer_manager.buffer_message_directly(
             {
                 "sphere": self.sphere, #aqui ele passa OK
@@ -218,8 +215,6 @@ class FusedLIDAR(BaseLidar):
             self.parent_id,
             TopicsEnum.LIDAR_DATA_BROADCAST,
         )
-
-        #print(f"[FusedLIDAR {self.parent_id}] Synthetic LiDAR update complete. {len(self.features)} features projected.")
         
 
 
@@ -228,37 +223,40 @@ class FusedLIDAR(BaseLidar):
     def read_data(self) -> Dict:
         #print(self.buffer_manager.print_buffer_status())
 
-        #if self.debug:
-        self.render_lidar_debug_rays()
+        if self.debug:
+            self.render_lidar_debug_rays()
+
         if not self.activate_fusion:
             return {"sphere": self.sphere, "features": self.features}
         
         self.sphere_stack = self._build_valid_spheres()
         self.padded_stack, self.mask = self._pad_sphere_stack(self.sphere_stack)
 
-        #if self.debug:
-        self.render_random_stacked_lidar_debug_rays()
+        if self.debug:
+            self.render_random_stacked_lidar_debug_rays()
 
-        print(f"time {self.padded_stack[1][LidarChannels.time.value]}")
+        #print(f"time {self.padded_stack[1][LidarChannels.time.value]}")
         self.padded_stack, self.mask = self.randomize_stack(self.padded_stack, self.mask)
-   
+
+        #print(f"[DEBUG] FusedLIDAR {self.parent_id} read_data After Pad and Random -> stack shape: {self.padded_stack.shape}, mask shape: {self.mask.shape}")
         return {"sphere": self.sphere, "features": self.features, "stacked_spheres": self.padded_stack, "validity_mask": self.mask}
 
-    def randomize_stack(self, sphere_stack, validity_mask):
+    def randomize_stack(self, padded_stack, validity_mask)-> Tuple[np.ndarray, np.ndarray]:
         """
         Randomizes the order of the spheres in the stack while preserving the validity mask.
         """
-        if sphere_stack is None or validity_mask is None:
-            print("[DEBUG] No sphere_stack or validity_mask available.")
-            return None, None
+        #if sphere_stack is None or validity_mask is None:
+            #print("[DEBUG] No sphere_stack or validity_mask available.")
+        #    return None, None
 
+        #print(f"[DEBUG] FusedLIDAR randomize_stack -> Before randomization: stack shape: {padded_stack.shape}, validity_mask shape: {validity_mask.shape}")
         # Combine the stack and mask into a single array
-        combined = list(zip(sphere_stack, validity_mask))
+        combined = list(zip(padded_stack, validity_mask))
         random.shuffle(combined)
 
         # Unzip the combined array
         randomized_stack, randomized_mask = zip(*combined)
-
+        #print(f"[DEBUG] FusedLIDAR randomize_stack -> After randomization: stack shape: {np.array(list(randomized_stack)).shape}, validity_mask shape: {np.array(list(randomized_mask)).shape}")
         return np.array(list(randomized_stack)), np.array(list(randomized_mask))
 
     def reset(self):
@@ -278,12 +276,15 @@ class FusedLIDAR(BaseLidar):
         #TODO: How to handle the mask?
         # The shape is (N, C, θ, φ) where N = 1 + max_neighbors
         # and C, θ, φ are defined by the LIDARSpec.
+
+        #print(f"[DEBUG] get_stacked_lidar_shape: {self.lidar_spec.get_stacked_lidar_shape(self.n_neighbors_max)}")
         return self.lidar_spec.get_stacked_lidar_shape(self.n_neighbors_max)
     
     def get_validity_mask_shape(self):
         #TODO: How to handle the mask?
         # The shape is (N, C, θ, φ) where N = 1 + max_neighbors
         # and C, θ, φ are defined by the LIDARSpec.
+        #print(f"[DEBUG] get_validity_mask_shape: {self.lidar_spec.get_validity_mask_shape(self.n_neighbors_max)}")
         return self.lidar_spec.get_validity_mask_shape(self.n_neighbors_max)
 
 
@@ -317,13 +318,14 @@ class FusedLIDAR(BaseLidar):
 
         # Stack into single array (N, C, θ, φ)
         sphere_stack_padded = np.stack(padded_spheres, axis=0)
-        print(f"[DEBUG] validity_mask: {validity_mask}")
+        #print(f"[DEBUG] validity_mask: {validity_mask}")
 
+        #print(f"[DEBUG] FusedLIDAR _pad_sphere_stack -> sphere_stack_padded shape: {sphere_stack_padded.shape}, validity_mask shape: {validity_mask.shape}")
         return sphere_stack_padded, validity_mask
 
     def enable_fusion(self):
         self.activate_fusion = True
-        print("Fused lidar activated")
+        #print("Fused lidar activated")
 
     def render_random_stacked_lidar_debug_rays(self):
         """
@@ -331,11 +333,12 @@ class FusedLIDAR(BaseLidar):
         drawn from the own_drone's position using a unique color.
         """
         if not hasattr(self, 'padded_stack') or self.sphere_stack is None:
-            print("[DEBUG] No padded_stack available.")
+            
+            #print("[DEBUG] No padded_stack available.")
             return
 
         if len(self.sphere_stack) < 2:
-            print("[DEBUG] Empty padded_stack.")
+            #print("[DEBUG] Empty padded_stack.")
             return
 
         # Select a random index
@@ -343,7 +346,7 @@ class FusedLIDAR(BaseLidar):
 
         own_drone = self.get_own_snapshot()
         if own_drone is None or own_drone.position is None:
-            print("[DEBUG] own_drone snapshot or position unavailable.")
+            #print("[DEBUG] own_drone snapshot or position unavailable.")
             return
 
 
@@ -366,11 +369,11 @@ class FusedLIDAR(BaseLidar):
 
         if own_drone.sphere is not None:
             are_equal = np.array_equal(own_drone.sphere, self.sphere_stack[0])
-            print(f"[DEBUG] self.sphere == sphere_stack[0]? {are_equal}")
+            #print(f"[DEBUG] self.sphere == sphere_stack[0]? {are_equal}")
 
         
         color = colors[target_idx % len(colors)]
-        print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
+        #print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
 
         for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
             norm_dist = self.sphere_stack[1][LidarChannels.distance.value][theta_idx][phi_idx]
@@ -410,7 +413,7 @@ class FusedLIDAR(BaseLidar):
             i.e., the same spatial direction may correspond to different entities across
             time steps.
         """
-        print(f"[VISUALIZATION] Showing fused rays for loyalwingman {self.parent_id}")
+        #print(f"[VISUALIZATION] Showing fused rays for loyalwingman {self.parent_id}")
         #if self.parent_id == 12:
         #    return
         # Select a random index
@@ -419,7 +422,7 @@ class FusedLIDAR(BaseLidar):
 
         own_drone = self.get_own_snapshot()
         if own_drone is None or own_drone.position is None:
-            print("[DEBUG] Own drone snapshot or position unavailable.")
+            #print("[DEBUG] Own drone snapshot or position unavailable.")
             return
 
         position = own_drone.position
@@ -446,7 +449,7 @@ class FusedLIDAR(BaseLidar):
         
         color = colors[target_idx % len(colors)]
         #print(f"Color choice: {color}")
-        print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
+        #print(f"[DEBUG] Random sphere idx={target_idx}, color={color}")
 
         for theta_idx, phi_idx in itertools.product(range(theta_count), range(phi_count)):
             norm_dist = sphere[LidarChannels.distance.value][theta_idx][phi_idx]

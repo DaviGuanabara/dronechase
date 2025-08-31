@@ -225,6 +225,9 @@ class CustomActorCriticPolicyMixedObservation(ActorCriticPolicy):
 
 # ===================================================================================================
 # PPO Extractor
+#
+# The official extractor class is LidarInertialActionExtractor for ThreatEngage up to level 4
+#
 # ===================================================================================================
 
 
@@ -232,7 +235,7 @@ class LidarInertialActionExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict, features_dim: int = 256):
         # super(LidarInertialActionExtractor, self).__init__()
         print("LidarInertialActionExtractor")
-        print("[Warning] Gun observation key is not processed here")
+        print("[Warning] Gun observation key is not processed here (the key is not, but is expected Gun observation together in inertial_data)")
         super().__init__(observation_space, features_dim)
 
         lidar = observation_space["lidar"]

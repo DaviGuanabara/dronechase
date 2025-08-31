@@ -4,6 +4,7 @@ from typing import Dict, Optional
 from dataclasses import dataclass
 import math
 
+from core.dataclasses.message_context import MessageContext
 from threatengage.environments.level4.components.utils.normalization import normalize_inertial_data
 from threatengage.environments.level4.components.tasks_management.task_progression import TaskStatus, Task
 from threatengage.environments.level4.components.entities_management.entities_manager import EntitiesManager, Quadcopter
@@ -12,7 +13,7 @@ from threatengage.environments.level4.components.entities_management.offsets_han
 from core.entities.navigators.loitering_munition_navigator import KamikazeNavigator
 from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 from core.notification_system.message_hub import MessageHub
-from core.notification_system.topics_enum import Topics_Enum
+from core.notification_system.topics_enum import TopicsEnum
 from core.entities.immovable_structures.immovable_structures import ImmovableStructures
 from core.entities.navigators.loyalwingman_navigator import LoyalWingmanBehaviorTree
 from core.entities.navigators.loitering_munition_navigator_air_combat_only import (
@@ -68,14 +69,14 @@ class Exp01_Task(Task):
 
         self.messageHub = MessageHub()
         self.messageHub.subscribe(
-            topic=Topics_Enum.AGENT_STEP_BROADCAST.value,
+            topic=TopicsEnum.AGENT_STEP_BROADCAST,
             subscriber=self._subscriber_simulation_step,
         )
 
         self.kamikaze_navigator = KamikazeNavigator(building_position)
         self.loyalwingman_navigator = LoyalWingmanBehaviorTree(building_position)
 
-    def _subscriber_simulation_step(self, message: Dict, publisher_id: int):
+    def _subscriber_simulation_step(self, message: Dict, message_context: MessageContext):
         self.current_step = message.get("step", 0)
         self.timestep = message.get("timestep", 0)
 

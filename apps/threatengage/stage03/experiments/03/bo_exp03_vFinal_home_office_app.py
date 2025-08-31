@@ -16,13 +16,13 @@ from threatengage.environments.level4.exp03_vFinal_environment import (
     Exp03vFinalEnvironment as level4,
 )
 
-from threatengage.rl_framework.utils.pipeline import (
+from core.rl_framework.utils.pipeline import (
     ReinforcementLearningPipeline,
     callbacklist,
     CallbackType,
 )
 
-from threatengage.rl_framework.utils.directory_manager import DirectoryManager
+from core.rl_framework.utils.directory_manager import DirectoryManager
 
 from stable_baselines3.common.logger import configure
 import torch
@@ -141,10 +141,16 @@ def rl_pipeline(
     # path_lib = Path("from_level_2/mPPO-r4985.2099609375-sd1149.3851318359375.zip")
     print("Melhor do Level 3: ")
     print("t2_PPO_r4427.63.zip - Trial 02")
+    #path_lib = Path(
+    #    "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output\\baysian_optimizer_app_v2_ciclo_02\\19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls\\Trial_2\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t2_PPO_r4427.63.zip"
+    #)
+
     path_lib = Path(
-        "C:\\Users\\davi_\\Documents\\GitHub\\PyFlyt\\apps\\level3\\output\\baysian_optimizer_app_v2_ciclo_02\\19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls\\Trial_2\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t2_PPO_r4427.63.zip"
+        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\experiment_results\\threat_engage\\Etapa 02 - Level 3\\Ciclo 02\\19_01_2023_level3_cicle_02_2.00M_v2_6_m_p2_600_calls\\Trial_2\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t2_PPO_r4427.63.zip"
     )
+
     model = PPO.load(str(path_lib), env=vectorized_environment)
+    print(model.policy.features_extractor.__class__)
     lr_schedule = lambda _: learning_rate
     model.learning_rate = lr_schedule
     model.batch_size = suggestions["batch_size"]

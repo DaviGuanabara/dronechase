@@ -118,7 +118,7 @@ class EntitiesManager:
         use_fused_lidar=True
     ) -> List[Quadcopter]:
 
-        print("[DEBUG] EntitiesManager: spawning pursuer")
+        #print("[DEBUG] EntitiesManager: spawning pursuer")
 
         return self.spawn_quadcopter(
             positions, EntityType.LOYALWINGMAN, names, lidar_radius, use_fused_lidar=use_fused_lidar

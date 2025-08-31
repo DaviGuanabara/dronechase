@@ -19,8 +19,8 @@ class BaseLidar(Sensor):
     
     def __init__(self, parent_id, client_id, debug = False, radius: float = 1.0, resolution: float = 1.0, n_neighbors_min: int = 1, n_neighbors_max: int = 10, verbose:bool = False):
         """
-        theta = 0 to pi
-        phi = -pi to pi
+        theta = 0 to pi -> polar
+        phi = -pi to pi -> azimuthal -> circular
         """
         
         self.parent_id = parent_id
