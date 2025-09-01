@@ -267,13 +267,13 @@ class Level5FusionTask(Task):
 
     def on_env_init(self):
         self._stage_status = TaskStatus.RUNNING
-        print("level 5 fusion Task - on_env_init - Spawning invaders and pursuers")
+        #print("level 5 fusion Task - on_env_init - Spawning invaders and pursuers")
         self.spawn_invader_squad()
         self.spawn_pursuer_squad()
 
     def on_reset(self):
 
-        print("level 5 task fusion task - on reset")
+        #print("level 5 task fusion task - on reset")
         self.on_episode_end()
         self.on_episode_start()
 
@@ -302,7 +302,8 @@ class Level5FusionTask(Task):
         Here lies the methods that should be executed BEFORE the STEP.
         It aims to set the environment to the simulation step execution.
         """
-        # print("on step start")
+        #print("on step start")
+        #print(f"[DEBUG] Level5FusionTask on_step_start - current_step: {self.current_step}")
         self.drive_invaders()
         self.drive_loyalwingmen()
 
@@ -558,10 +559,12 @@ class Level5FusionTask(Task):
         # Step count exceeds maximum.
         if self.current_step > self.MAX_STEP:
             self._stage_status = TaskStatus.FAILURE
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Max step exceeded")
             return True
 
         if self.is_all_rounds_over():
-            # print("(compute termination) All rounds completed")
+            #print(
+                #"[DEBUG] Level 5 fusion task (compute termination) - All rounds completed")
             self._stage_status = TaskStatus.SUCCESS
             return True
 
@@ -578,6 +581,7 @@ class Level5FusionTask(Task):
         )
         if num_pursuers_outside_dome > 0:
             self._stage_status = TaskStatus.FAILURE
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Pursuer outside dome")
             return True
 
         num_invaders_outside_dome = len(
@@ -585,12 +589,14 @@ class Level5FusionTask(Task):
         )
         if num_invaders_outside_dome > 0:
             self._stage_status = TaskStatus.FAILURE
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Invader outside dome")
             return True
 
         # All pursuers destroyed.
         if len(self.entities_manager.get_armed_pursuers()) == 0:
             # print("All pursuers destroyed")
             self._stage_status = TaskStatus.FAILURE
+            #print("[DEBUG] Level 5 fusion task (compute termination) - All pursuers destroyed")
             return True
 
         # This is an training environment, which means that it has to stop when the agent dies.
@@ -598,6 +604,7 @@ class Level5FusionTask(Task):
 
         if not agent.armed:
             self._stage_status = TaskStatus.FAILURE
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
             return True
 
         # O QUE DEU MELHOR ANTES NÃO TINHA ISSO

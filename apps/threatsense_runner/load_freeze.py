@@ -329,7 +329,7 @@ def main():
     n_trials = 10
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"31_08_2025_level5_{n_timesteps_in_millions:.2f}M_level5_fusion_3"
+    study_name = f"01_09_2025_level5_{n_timesteps_in_millions:.2f}M_level5_fusion_1"
 
     print("Baysian Optimizer")
     print(f"number of trials: {n_trials}")
