@@ -322,6 +322,10 @@ class Quadcopter:
    
             self.lidar.update_data()
             lidar_data = self.lidar.read_data()
+            if not hasattr(self, "_printed_once_read"):
+                print(f"[DEBUG] quadcopter read_data keys: {list(lidar_data.keys())}")
+                self._printed_once_read = True
+            
             self._update_flight_state(lidar_data)
             self._publish_lidar_data(lidar_data)
         # if self.debug_on:

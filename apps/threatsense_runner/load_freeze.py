@@ -199,7 +199,7 @@ def rl_pipeline(
 
     # Cria env
     vectorized_environment: VecMonitor = ReinforcementLearningPipeline.create_vectorized_environment(
-        environment=Level5_Fusion, env_kwargs=suggestions
+        environment=Level5_Fusion, env_kwargs=suggestions, n_envs=16
     )
 
     # Callbacks

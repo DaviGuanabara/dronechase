@@ -227,13 +227,15 @@ class FusedLIDAR(BaseLidar):
             self.render_lidar_debug_rays()
 
         if not self.activate_fusion:
+            #print(
+            #    f"[DEBUG] Fusion not active yet for {self.parent_id} at step {getattr(self, 'current_step', 'N/A')}")
             return {"sphere": self.sphere, "features": self.features}
         
         self.sphere_stack = self._build_valid_spheres()
         self.padded_stack, self.mask = self._pad_sphere_stack(self.sphere_stack)
 
-        if self.debug:
-            self.render_random_stacked_lidar_debug_rays()
+        #if self.debug:
+            #self.render_random_stacked_lidar_debug_rays()
 
         #print(f"time {self.padded_stack[1][LidarChannels.time.value]}")
         self.padded_stack, self.mask = self.randomize_stack(self.padded_stack, self.mask)

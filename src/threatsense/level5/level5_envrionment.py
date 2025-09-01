@@ -165,6 +165,11 @@ class Level5Environment(Env):
         self.step_counter = 0
 
         observation = self.compute_observation()
+        if not hasattr(self, "_printed_once_obs"):
+            print(
+                f"[DEBUG] LEVEL 5 ENVIRONMENT RESET compute_observation returning: {list(observation.keys())}")
+            self._printed_once_obs = True
+
         info = self.compute_info()
 
         print("Level 5 Environment - reset done")
@@ -196,6 +201,8 @@ class Level5Environment(Env):
         # info = self.compute_info()
 
         self.task_progression.on_step_end()
+
+        print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
         return observation, reward, terminated, truncated, info
 
     def advance_step(self):
@@ -234,20 +241,13 @@ class Level5Environment(Env):
         The RL AGENT PERSUER is the source of the observation.
         """
 
-        #TODO: Here is updating the lidar. but is updating only for the agent.
-        # I need to update the lidar for all loyal wingman.
         for pursuer in self.entities_manager.get_all_pursuers():
             pursuer.update_lidar()
 
         #rl_agent.update_lidar()
         rl_agent = self.entities_manager.get_agent()
         inertial_data: np.ndarray = self.process_inertial_state(rl_agent)
-        #rl_agent.lidar_data
-
-        #rl_agent.lidar_data
-
-        #O BUG ESTÁ AQUI. ELE 
-        #lidar = rl_agent.lidar_data.get("lidar", None)
+ 
         stacked_spheres = rl_agent.lidar_data.get("stacked_spheres", None)
         validity_mask = rl_agent.lidar_data.get("validity_mask", None)
 
@@ -263,6 +263,9 @@ class Level5Environment(Env):
 
         #print(f"[DEBUG] Level5Environment compute_observation -> mask {validity_mask}")
         #print(f"[DEBUG] Level5Environment compute_observation -> stacked_spheres shape: {stacked_spheres.shape}, validity_mask shape: {validity_mask.shape}")
+
+
+
         return {
             "stacked_spheres": stacked_spheres.astype(np.float32),
             # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
