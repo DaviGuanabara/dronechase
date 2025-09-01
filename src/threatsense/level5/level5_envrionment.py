@@ -67,6 +67,12 @@ class Level5Environment(Env):
         #self.task_progression.on_episode_start()
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
+        self.teacher_observation_space = self._teacher_observation_space()
+
+    def _teacher_observation_space(self):
+        return self._observation_space()
+
+
 
     def setup_static_entities(self):
         entities_manager = self.entities_manager
@@ -202,7 +208,7 @@ class Level5Environment(Env):
 
         self.task_progression.on_step_end()
 
-        print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
+        #print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
         return observation, reward, terminated, truncated, info
 
     def advance_step(self):
@@ -269,7 +275,7 @@ class Level5Environment(Env):
         return {
             "stacked_spheres": stacked_spheres.astype(np.float32),
             # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
-            "lidar": np.zeros((2, 13, 26), dtype=np.float32),
+            #"lidar": np.zeros((2, 13, 26), dtype=np.float32),
             "validity_mask": validity_mask.astype(bool),
             # inertial_data.astype(np.float32),
             "inertial_data": inertial_gun_concat,
@@ -306,12 +312,12 @@ class Level5Environment(Env):
                     shape=observation_shape["stacked_spheres"],
                     dtype=np.float32,
                 ),
-                "lidar": spaces.Box(
-                    0,
-                    1,
-                    shape=(2, 13, 26),   # 🔑 mantém shape antigo
-                    dtype=np.float32,
-                ),  # spaces.Box(0, 1, shape=observation_shape["lidar"], dtype=np.float32), #só por compatibilidade mesmo
+                #"lidar": spaces.Box(
+                #    0,
+                #    1,
+                #    shape=(2, 13, 26),   # 🔑 mantém shape antigo
+                #    dtype=np.float32,
+                #),  # spaces.Box(0, 1, shape=observation_shape["lidar"], dtype=np.float32), #só por compatibilidade mesmo
                 "validity_mask": spaces.MultiBinary(observation_shape["validity_mask"]),
                 "inertial_data": spaces.Box(
                     -np.ones((observation_shape["inertial_data"],)),

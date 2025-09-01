@@ -31,7 +31,7 @@ class ReinforcementLearningPipeline:
     @staticmethod
     def create_vectorized_environment(
         environment,
-        env_kwargs: dict,
+        env_kwargs: dict = {},
         n_envs: int = os.cpu_count() or 1,
         GUI=False,
         env_args=None,
