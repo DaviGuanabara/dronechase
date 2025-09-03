@@ -409,7 +409,14 @@ class Quadcopter:
         # - 6: vx, vy, vr, vz
         # - vp, vq, vr = angular velocities
         # - vx, vy, vz = ground linear velocities
+        self.last_motion_command = motion_command
         self.quadx.setpoint = self.convert_command_to_setpoint(motion_command)
+
+    @property
+    def last_action(self):
+        if hasattr(self, "last_motion_command"):
+            return self.last_motion_command
+        return np.zeros(4)
 
     # =================================================================================================================
     # Simulation Manager
