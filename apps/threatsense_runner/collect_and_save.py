@@ -58,13 +58,19 @@ def save_to_hdf5(file_path, obs, teacher_action):
                 )
             else:
                 teacher_group[key].resize(
-                    teacher_group[key].shape[0] + 1, axis=0)
+                    teacher_group[key].shape[0] + 1, axis=0
+                )
                 teacher_group[key][-1] = value
 
         # --- Student obs ---
         student_group = f.require_group("student")
         for key, value in obs["student_observation"].items():
-            value = np.array(value, dtype=np.float32)
+            # mantém validity_mask como bool
+            if key == "validity_mask":
+                value = np.array(value, dtype=np.bool_)
+            else:
+                value = np.array(value, dtype=np.float32)
+
             if key not in student_group:
                 maxshape = (None,) + value.shape
                 student_group.create_dataset(
@@ -72,18 +78,25 @@ def save_to_hdf5(file_path, obs, teacher_action):
                 )
             else:
                 student_group[key].resize(
-                    student_group[key].shape[0] + 1, axis=0)
+                    student_group[key].shape[0] + 1, axis=0
+                )
                 student_group[key][-1] = value
 
         # --- Teacher actions (target) ---
         teacher_action = np.array(teacher_action, dtype=np.float32)
         if "teacher_actions" not in f:
-            f.create_dataset("teacher_actions", data=teacher_action[None],
-                             maxshape=(None,) + teacher_action.shape, chunks=True)
+            f.create_dataset(
+                "teacher_actions",
+                data=teacher_action[None],
+                maxshape=(None,) + teacher_action.shape,
+                chunks=True,
+            )
         else:
             f["teacher_actions"].resize(
-                f["teacher_actions"].shape[0] + 1, axis=0)
+                f["teacher_actions"].shape[0] + 1, axis=0
+            )
             f["teacher_actions"][-1] = teacher_action
+
 
 
 
@@ -113,6 +126,7 @@ while(observations_collected < max_observations_collected):
 
 
     observations, reward, terminated, truncated, info = env.step()
+    #print(observations[0]["validity_mask"])
 
     #print(observations.shape, info["teacher_observation"].shape, info["student_observation"].shape)
     observations_collected += len(observations)
@@ -121,8 +135,8 @@ while(observations_collected < max_observations_collected):
         final_obs = {}
         final_obs["teacher_observation"] = info["teacher_observation"][i]
         final_obs["student_observation"] = info["student_observation"][i]
-        file_id = observations_collected // 1_000_000
-        file_name = f"03.09.2025_final_collect_and_save_output_part{file_id}.h5"
+        file_id = observations_collected // 1_000
+        file_name = f"output/collect_and_save/05.09.2025_final_collect_and_save_output_part{file_id}.h5"
         teacher_action = info["actions"][i]
         save_to_hdf5(file_name, obs=final_obs,teacher_action=teacher_action)
         
