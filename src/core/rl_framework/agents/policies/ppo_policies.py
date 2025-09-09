@@ -25,7 +25,7 @@ from typing import NamedTuple
 
 import gymnasium as gym
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-
+from core.rl_framework.agents.policies.fused_lidar_extractor import FLIAExtractor
 
 class MatrixInputShape(NamedTuple):
     channel: int  # can be 0 (distance) or 1 (target type)
@@ -339,3 +339,69 @@ class LidarInertialActionExtractor(BaseFeaturesExtractor):
             dim=1,
         )
         return self.final_layer(concatenated_features)
+    
+
+class StudentWithFLIA(BaseFeaturesExtractor):
+    def __init__(self, observation_space, features_dim=512, action_dim=4):
+        super().__init__(observation_space, features_dim)
+        self.feature_extractor = FLIAExtractor(
+            observation_space, features_dim=features_dim)
+        self.mlp_head = nn.Sequential(
+            nn.Linear(features_dim, 128),
+            nn.Tanh(),
+            nn.Linear(128, 256),
+            nn.Tanh(),
+            nn.Linear(256, 512),
+            nn.Tanh(),
+            nn.Linear(512, action_dim),
+        )
+
+    def forward(self, obs):
+        features = self.feature_extractor(obs)
+        return self.mlp_head(features)
+    
+
+
+
+
+class StudentPolicy(ActorCriticPolicy):
+    def __init__(self, observation_space, action_space, lr_schedule, **kwargs):
+        super(StudentPolicy, self).__init__(
+            observation_space, action_space, lr_schedule, **kwargs)
+
+        # usa sua StudentWithFLIA como backbone
+        self.backbone = StudentWithFLIA(observation_space)
+
+        # carrega os pesos supervisionados aqui
+        self.backbone.load_state_dict(torch.load(
+            "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_models_all_3\\models\\student_last_model_0.pt"))
+
+        # policy head (ações)
+        # 4 -> sua dimensão da ação
+        self.action_net = nn.Linear(4, action_space.shape[0])
+        # value head (valor do estado)
+        self.value_net = nn.Linear(4, 1)
+
+    def forward(self, obs, deterministic=False):
+        features = self.backbone(obs)  # [B, 4]
+
+        # valor do estado
+        values = self.value_net(features)
+
+        # distribuição gaussiana diagonal
+        mean_actions = self.action_net(features)
+        distribution = self.action_dist.proba_distribution(
+            mean_actions, self.log_std)
+
+        # amostra ação
+        actions = distribution.get_actions(deterministic=deterministic)
+        log_prob = distribution.log_prob(actions)
+
+        return actions, values, log_prob
+
+    def _predict(self, obs, deterministic=False):
+        features = self.backbone(obs)
+        mean_actions = self.action_net(features)
+        distribution = self.action_dist.proba_distribution(
+            mean_actions, self.log_std)
+        return distribution.get_actions(deterministic=deterministic)

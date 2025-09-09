@@ -280,11 +280,16 @@ class LiDARBufferManager:
 
 
         self._buffer:SnapshotBuffer = SnapshotBuffer(max_buffer_size)
-
         self._publisher_entity_map: Dict[int, EntityType] = {}
 
         self.STABLE_DELTA_STEP = 1
         self.verbose = verbose
+
+
+    def reset(self, new_step: int = 0):
+        self._buffer = SnapshotBuffer(self._buffer.max_size)
+        #self._publisher_entity_map.clear() # the entities will kept same id.
+        self._buffer.current_step = new_step
 
 
     @property

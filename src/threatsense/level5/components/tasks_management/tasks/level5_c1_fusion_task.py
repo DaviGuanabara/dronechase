@@ -35,8 +35,7 @@ Os inimigos serão incrementados de 5 em 5 a cada round, para assim em pouco tem
 chegar a 30 inimigos, com uma alta probabilidade de oclusão.
 """
 
-
-class Level5DumbMultiObjectTask(Task):
+class Level5C1FusionTask(Task):
     def __init__(
         self,
         # simulation,
@@ -44,7 +43,7 @@ class Level5DumbMultiObjectTask(Task):
         dome_radius: float,
         # debug_on: bool = False,
         building_position: np.ndarray = np.array([0, 0, 0.1]),
-
+       
     ):
         print("Level 5 - Task Init")
 
@@ -73,7 +72,7 @@ class Level5DumbMultiObjectTask(Task):
         self.loyalwingman_navigator = LoyalWingmanBehaviorTree(
             building_position)
 
-        # print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
+        #print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
 
     def _subscriber_simulation_step(self, message: Dict, message_context: MessageContext):
         self.current_step = message.get("step", 0)
@@ -84,34 +83,37 @@ class Level5DumbMultiObjectTask(Task):
         n_invaders_to_activate = (current_round - 1) * self.INVADERS_PER_ROUND + self.INITIAL_NUMBER_OF_INVADERS
         """
 
-        self.NUM_PURSUERS = 6 + 1  # +1 for the agent
+        self.NUM_PURSUERS = 1 + 1  # +1 for the agent
         self.INVADERS_PER_ROUND = 1
-        self.INITIAL_NUMBER_OF_INVADERS = 5
-        self.MAX_NUM_INVADERS = 30
+        self.INITIAL_NUMBER_OF_INVADERS = 4
+        self.MAX_NUM_INVADERS = 10
 
-        self.MAX_NUMBER_OF_ROUNDS = math.ceil(
-            ((self.MAX_NUM_INVADERS - self.INITIAL_NUMBER_OF_INVADERS) / self.INVADERS_PER_ROUND) + 1)
+
+        self.MAX_NUMBER_OF_ROUNDS = math.ceil(((self.MAX_NUM_INVADERS - self.INITIAL_NUMBER_OF_INVADERS) / self.INVADERS_PER_ROUND) + 1)
         self.INITIAL_ROUND = 1
 
         # Munitions must be calculated to account for the number of invaders
         total_invaders = (self.INITIAL_NUMBER_OF_INVADERS +
                           self.MAX_NUM_INVADERS) * self.MAX_NUMBER_OF_ROUNDS // 2
 
+
         self.MUNITION_PER_DEFENDER = total_invaders
 
-        # Standard, No need to change
+
+        #Standard, No need to change
         self.MAX_REWARD = 1000
         self.ENEMY_BORN_RADIUS = 6
         self.INVADER_EXPLOSION_RANGE = 0.2
         self.PURSUER_SHOOT_RANGE = 1
 
-        # Premature ending of the episode
-        # Pressure for killing invaders quickly
+        #Premature ending of the episode
+        #Pressure for killing invaders quickly
         self.STEP_INCREMENT = 100
         self.MAX_STEP = 300
 
-        # print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
-        # print(f"[INIT] MAX_NUM_INVADERS: {self.MAX_NUM_INVADERS}")
+
+        #print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
+        #print(f"[INIT] MAX_NUM_INVADERS: {self.MAX_NUM_INVADERS}")
 
     def init_globals(self):
         self.current_step = 0
@@ -171,14 +173,14 @@ class Level5DumbMultiObjectTask(Task):
         return self.current_round
 
     def setup_round(self, current_round):
-
+        
         self.entities_manager.disarm_all_invaders()
         invaders = self.entities_manager.get_all_invaders()
 
         n_invaders_to_activate = min((current_round - 1) * self.INVADERS_PER_ROUND +
                                      self.INITIAL_NUMBER_OF_INVADERS, self.MAX_NUM_INVADERS)
 
-        # print(f"[ROUND {current_round}] Activating {n_invaders_to_activate} invaders.")
+        #print(f"[ROUND {current_round}] Activating {n_invaders_to_activate} invaders.")
         positions = self.generate_positions(
             n_invaders_to_activate, self.ENEMY_BORN_RADIUS)
         for i in range(n_invaders_to_activate):
@@ -255,12 +257,6 @@ class Level5DumbMultiObjectTask(Task):
 
     def drive_loyalwingmen(self):
         allies = self.entities_manager.get_allies(armed=True)
-        agent = self.entities_manager.get_agent()
-
-        if agent.armed:
-            self.loyalwingman_navigator.update(agent, self.offset_handler)
-
-        #pursuers = self.entities_manager.get_all_pursuers()
 
         for ally in allies:
             self.loyalwingman_navigator.update(ally, self.offset_handler)
@@ -271,13 +267,13 @@ class Level5DumbMultiObjectTask(Task):
 
     def on_env_init(self):
         self._stage_status = TaskStatus.RUNNING
-        # print("level 5 fusion Task - on_env_init - Spawning invaders and pursuers")
+        #print("level 5 fusion Task - on_env_init - Spawning invaders and pursuers")
         self.spawn_invader_squad()
         self.spawn_pursuer_squad()
 
     def on_reset(self):
 
-        # print("level 5 task fusion task - on reset")
+        #print("level 5 task fusion task - on reset")
         self.on_episode_end()
         self.on_episode_start()
 
@@ -306,8 +302,8 @@ class Level5DumbMultiObjectTask(Task):
         Here lies the methods that should be executed BEFORE the STEP.
         It aims to set the environment to the simulation step execution.
         """
-        # print("on step start")
-        # print(f"[DEBUG] Level5FusionTask on_step_start - current_step: {self.current_step}")
+        #print("on step start")
+        #print(f"[DEBUG] Level5FusionTask on_step_start - current_step: {self.current_step}")
         self.drive_invaders()
         if not freeze_lw:
             self.drive_loyalwingmen()
@@ -457,7 +453,10 @@ class Level5DumbMultiObjectTask(Task):
         pursuer_suicided=0,
         agent_suicided=0,
         allies_dead=0,   # opcional, default 0
-    ):  # sourcery skip: move-assign
+    ):
+        """
+        COMPUTE REWARD ADAPTADO PARA ESSA TASK
+        """
         # componentes
         score, bonus, penalty = 0.0, 0.0, 0.0
         agent = self.entities_manager.get_agent()
@@ -467,7 +466,6 @@ class Level5DumbMultiObjectTask(Task):
         gun_available = agent.gun_state[2]
 
         position = agent.inertial_data["position"]
-        velocity = agent.inertial_data["velocity"]
 
         # segurança: inicializa last_closest_distance
         if not hasattr(self, "last_closest_distance") or not np.isfinite(getattr(self, "last_closest_distance", np.inf)):
@@ -475,50 +473,37 @@ class Level5DumbMultiObjectTask(Task):
 
         distance_to_origin = float(np.linalg.norm(position))
 
-        # alvo: invader mais próximo do aliado mais próximo (ou do agente, se não houver aliado)
-        closest_ally_id = self.offset_handler.identify_closest_ally(agent.id)
-        target_id = (self.offset_handler.identify_closest_invader(agent.id)
-                     if closest_ally_id == -1
-                     else self.offset_handler.identify_closest_invader(closest_ally_id))
-
+        # alvo: inimigo mais próximo do agente
+        target_id = self.offset_handler.identify_closest_invader(agent.id)
         target_position = np.array([0.0, 0.0, 0.0])
         if target_id > -1:
             target = self.entities_manager.get_quadcopters(id=target_id)[0]
             target_position = target.inertial_data["position"]
 
         self.current_closest_distance = float(
-            np.linalg.norm(position - target_position))
+            np.linalg.norm(position - target_position)
+        )
 
         # ----------------------
         # Parâmetros
-
-        SAFE_RADIUS = 5.0  # distância segura no reload
-        VMIN = 0.5  # vel. mínima para contar "ação"
-        AGENT_KILL_W = 1.0  # peso para abates do agente
-        ALLY_COOP_W = 0.5  # crédito por abates de aliados
-        SPEED_BONUS_W = 0.10  # fração do MAX_REWARD
+        SAFE_RADIUS = 5.0   # distância segura no reload
+        AGENT_KILL_W = 1.0   # peso para abates do agente
+        ALLY_COOP_W = 0.5   # crédito por abates de aliados
         RELOAD_AWAY_W = 0.10  # bônus por se afastar no reload
         RELOAD_RISK_W = 0.50  # penalidade se muito perto no reload
         ALLY_DEAD_W = 0.75  # penalidade por aliado morto
-        SELF_DEATH_W = 2.0  # penalidade por morte própria
-        BORDER_W = 1.0  # peso da penalidade de borda
+        SELF_DEATH_W = 2.0   # penalidade por morte própria
+        BORDER_W = 1.0   # peso da penalidade de borda
         # ----------------------
 
-        # Base: incentivo a aproximar quando arma disponível (ou sem munição), afastar no reload
+        # Base: engajar quando arma pronta ou sem munição; recuar quando arma indisponível
         if gun_available == 1 or munition == 0:
             score = -self.current_closest_distance
         else:
-            score = +self.current_closest_distance  # maximize distância no reload
+            score = +self.current_closest_distance
             if self.current_closest_distance < SAFE_RADIUS:
                 penalty += ((SAFE_RADIUS - self.current_closest_distance) /
                             max(SAFE_RADIUS, 1e-6)) * (RELOAD_RISK_W * self.MAX_REWARD)
-
-        # Ação: bônus de velocidade só se está realmente aproximando e em condição de engajar
-        # closed_dist = (self.last_closest_distance -
-        #            self.current_closest_distance) > 0.01
-        # speed = float(np.linalg.norm(velocity))
-        # if closed_dist and (gun_available == 1 or munition == 0) and speed > VMIN:
-        #    bonus += (min(speed, 5.0) / 5.0) * (SPEED_BONUS_W * self.MAX_REWARD)
 
         # Reload prudente: se aumentando distância durante reload, pequeno bônus
         if (gun_available == 0 and munition > 0) and ((self.current_closest_distance - self.last_closest_distance) > 0.01):
@@ -558,17 +543,19 @@ class Level5DumbMultiObjectTask(Task):
         total = score + bonus - penalty
         return float(np.clip(total, -3.0 * self.MAX_REWARD, 3.0 * self.MAX_REWARD))
 
+
+
     def compute_termination(self) -> bool:
         """Calculate if the simulation is done."""
         # Step count exceeds maximum.
         if self.current_step > self.MAX_STEP:
             self._stage_status = TaskStatus.FAILURE
-            # print("[DEBUG] Level 5 fusion task (compute termination) - Max step exceeded")
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Max step exceeded")
             return True
 
         if self.is_all_rounds_over():
-            # print(
-            # "[DEBUG] Level 5 fusion task (compute termination) - All rounds completed")
+            #print(
+                #"[DEBUG] Level 5 fusion task (compute termination) - All rounds completed")
             self._stage_status = TaskStatus.SUCCESS
             return True
 
@@ -585,7 +572,7 @@ class Level5DumbMultiObjectTask(Task):
         )
         if num_pursuers_outside_dome > 0:
             self._stage_status = TaskStatus.FAILURE
-            # print("[DEBUG] Level 5 fusion task (compute termination) - Pursuer outside dome")
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Pursuer outside dome")
             return True
 
         num_invaders_outside_dome = len(
@@ -593,24 +580,23 @@ class Level5DumbMultiObjectTask(Task):
         )
         if num_invaders_outside_dome > 0:
             self._stage_status = TaskStatus.FAILURE
-            # print("[DEBUG] Level 5 fusion task (compute termination) - Invader outside dome")
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Invader outside dome")
             return True
 
         # All pursuers destroyed.
         if len(self.entities_manager.get_armed_pursuers()) == 0:
             # print("All pursuers destroyed")
             self._stage_status = TaskStatus.FAILURE
-            # print("[DEBUG] Level 5 fusion task (compute termination) - All pursuers destroyed")
+            #print("[DEBUG] Level 5 fusion task (compute termination) - All pursuers destroyed")
             return True
 
         # This is an training environment, which means that it has to stop when the agent dies.
         agent = self.entities_manager.get_agent()
 
-        
-        #if not agent.armed:
-        #    self._stage_status = TaskStatus.FAILURE
-            # print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
-        #    return True
+        if not agent.armed:
+            self._stage_status = TaskStatus.FAILURE
+            #print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
+            return True
 
         # O QUE DEU MELHOR ANTES NÃO TINHA ISSO
         position = agent.inertial_data["position"]
@@ -694,7 +680,7 @@ class Level5DumbMultiObjectTask(Task):
         allies_pos = positions[1:]
         ally_names = [f"Ally{i}" for i in range(1, self.NUM_PURSUERS)]
 
-        # TODO: There is a problem here
+        #TODO: There is a problem here
         # this 'agent' is not the agent. This is misleading.
         # Spawn a agente com FusedLiDAR
         agent = self.entities_manager.spawn_pursuer(
@@ -710,10 +696,10 @@ class Level5DumbMultiObjectTask(Task):
         pursuers = agent + allies
 
         for pursuer in pursuers:
-            # print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
+            #print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
             pursuer.set_munition(self.MUNITION_PER_DEFENDER)
 
-        # print(f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
+        #print(f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
 
         self.entities_manager.set_agent()
 

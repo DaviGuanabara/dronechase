@@ -5,6 +5,7 @@ import numpy as np
 from threatsense.level5.components.tasks_management.task_progression import TaskProgression
 from threatsense.level5.components.tasks_management.tasks_dispatcher import TasksDispatcher
 from threatsense.level5.level5_envrionment import Level5Environment
+from gymnasium import Env, spaces
 
 class Level5DumbMultiObs(Level5Environment):
     def __init__(self, GUI=True, rl_frequency=15):
@@ -24,8 +25,17 @@ class Level5DumbMultiObs(Level5Environment):
         agent = self.entities_manager.get_agent()
         allies = self.entities_manager.get_allies()
         return [agent] + allies
+    
+    def _observation_space(self):
+        return spaces.Box(
+            low=0, high=1, shape=(1,), dtype=np.float32)
 
-    def compute_observation(self) -> np.ndarray:
+
+    def compute_observation(self):
+        return np.zeros(1).astype(np.float32)
+    
+
+    def _compute_general_vision(self) -> np.ndarray:
         """Return the observation of the simulation.
         The RL AGENT PERSUER is the source of the observation.
         """
@@ -36,7 +46,8 @@ class Level5DumbMultiObs(Level5Environment):
         # rl_agent.update_lidar()
         
         observations = []
-        pursuers = self._get_pursuers_agent_first()
+        #pursuers = self._get_pursuers_agent_first()
+        pursuers = self.entities_manager.get_armed_pursuers()
 
         for pursuer in pursuers:
             inertial_data: np.ndarray = self.process_inertial_state(pursuer)
@@ -66,55 +77,74 @@ class Level5DumbMultiObs(Level5Environment):
             })
 
         return np.array(observations)
-
-    def _compute_observation_teacher(self):
-        observations: np.ndarray = self.compute_observation()
-        for i in range(observations.shape[0]):
-            del observations[i]["stacked_spheres"]
-            del observations[i]["validity_mask"]
-        return observations
-
-    def _compute_observation_student(self):
-        observations: np.ndarray = self.compute_observation()
-        for i in range(observations.shape[0]):
-            del observations[i]["lidar"]
-        return observations
     
-    def step(self):
+    def _action_space(self):
+        return spaces.Box(
+            low=-1, high=1, shape=(4,), dtype=np.float32)
+
+
+    def _compute_student_vision(self):
+        observations: np.ndarray = self._compute_general_vision()
+        new_set = []
+        for observation in observations:
+            obs = {
+                "stacked_spheres": observation["stacked_spheres"],
+                "validity_mask": observation["validity_mask"],
+                "inertial_data": observation["inertial_data"],
+                "last_action": observation["last_action"],
+            }
+            new_set.append(obs)
+        return new_set
+
+    def step(self, action):
         
-        #TODO MUNDO RODA BT
-
-        
-
-        # TODO: Basically, i have to create a function in entities_manager that returns the RL Agent.
-        # And it needs to be separeted from other entities. Maybe, i just need to create a quadcopter_type called RL Agent.
-        # Or add another variable. I don't know yet.
-
-        # MAKE A CONSTANT
-
-        #rl_agent = self.entities_manager.get_agent()
-        #rl_agent.drive(rl_action, self.show_name_on)
 
         self.task_progression.on_step_start()
 
         self.advance_step()
-
-        reward, terminated = self.task_progression.on_step_middle()
-        #info = self.task_progression.compute_info()
-        
-
         observation = self.compute_observation()
+        reward, terminated = self.task_progression.on_step_middle()
+         
         info = self.compute_info()
-        truncated = False
 
         self.task_progression.on_step_end()
 
-        #print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
+        truncated = False
+        
         return observation, reward, terminated, truncated, info
-    
+
     def compute_info(self):
-        pursuers = self._get_pursuers_agent_first()
+
+        pursuers = self.entities_manager.get_armed_pursuers()
+
+        for pursuer in pursuers:
+            pursuer.update_lidar()
+
+        observations = []
         actions = []
-        actions.extend(pursuer.last_action for pursuer in pursuers)
-        actions = np.array(actions)
-        return {"student_observation": self._compute_observation_student(), "teacher_observation": self._compute_observation_teacher(), "actions": actions}
+
+
+        for pursuer in pursuers:
+
+            stacked_spheres = pursuer.lidar_data.get("stacked_spheres", None)
+            validity_mask = pursuer.lidar_data.get("validity_mask", None)
+
+            inertial_data: np.ndarray = self.process_inertial_state(pursuer)
+            gun_state = pursuer.gun_state
+            inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0)
+            
+            if stacked_spheres is None:
+                raise ValueError("Stacked spheres data is None")
+            if validity_mask is None:
+                raise ValueError("Validity mask data is None")
+
+            observations.append({
+                "stacked_spheres": stacked_spheres.astype(np.float32),
+                "validity_mask": validity_mask.astype(bool),
+                "inertial_data": inertial_gun_concat.astype(np.float32),
+                "last_action": pursuer.last_action.astype(np.float32),
+            })
+
+            actions.append(pursuer.last_action)
+
+        return {"student_observations": observations, "teacher_actions": actions}

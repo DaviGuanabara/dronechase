@@ -205,6 +205,14 @@ class Level5Environment(Env):
         pass
         #self.simulation.close()
 
+    def reset_step_counter(self):
+        self.step_counter = 0
+        self._broadcast_step()
+        
+    def advance_step_counter(self):
+        self.step_counter += 1
+        self._broadcast_step()
+
     def reset(self, seed=0):
         """Resets the environment.
         Returns
@@ -219,7 +227,7 @@ class Level5Environment(Env):
 
         self.init_globals()
         self.task_progression.on_reset()
-        self.step_counter = 0
+        self.reset_step_counter()
 
         observation = self.compute_observation()
         #if not hasattr(self, "_printed_once_obs"):
@@ -263,15 +271,20 @@ class Level5Environment(Env):
         #print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
         return observation, reward, terminated, truncated, info
 
+    def _broadcast_step(self):
+        ENVIRONMENT_ID = 0
+
+        message = {"step": self.step_counter, "timestep": 1 / self.rl_frequency}
+        message_context = self.message_hub.create_message_context(publisher_id=ENVIRONMENT_ID, step=self.step_counter)
+        self.message_hub.publish(topic=TopicsEnum.AGENT_STEP_BROADCAST, message=message, message_context=message_context)
+   
+
     def advance_step(self):
         for _ in range(self.aggregate_sim_steps):
             self.simulation.step()
 
-        ENVIRONMENT_ID = 0
-        self.step_counter += 1
-        message = {"step": self.step_counter, "timestep": 1 / self.rl_frequency}
-        message_context = self.message_hub.create_message_context(publisher_id=ENVIRONMENT_ID, step=self.step_counter)
-        self.message_hub.publish(topic=TopicsEnum.AGENT_STEP_BROADCAST, message=message, message_context=message_context)
+        self.advance_step_counter()
+
         #self.message_hub.publish(
         #    TopicsEnum.AGENT_STEP_BROADCAST,
         #    {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
