@@ -1,3 +1,4 @@
+from stable_baselines3 import PPO
 import torch.nn.functional as F
 from core.rl_framework.utils.io_data import IOData, MultiH5Dataset
 from torch.utils.data import DataLoader, Subset
@@ -103,6 +104,123 @@ class SupervisedImitationTrainer:
         return train_loader, val_loader
 
 
+    def train_student_ppo_wrapped(self, folder_path, model:PPO, action_dim=4, epochs=1,
+                      batch_size=256, lr=1e-3, model_output_dir="models_all", limit_size=500_000):
+        print("Iniciando treinamento do DATASET COMPLETO student...")
+
+        io_data = IOData(folder_path)
+        dataset = io_data.dataset
+        n = len(dataset)
+
+        # pega apenas 500 mil amostras aleatórias
+        indices = np.random.choice(n, size=limit_size, replace=False)
+        subset = Subset(dataset, indices)
+
+        loader = DataLoader(
+            subset, batch_size=batch_size, shuffle=True,
+            num_workers=8, pin_memory=True, persistent_workers=True
+        )
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+
+        self._train_ppo(model, device, loader, val_loader=None,
+                    epochs=epochs, lr=lr, fold_id=0, output_dir=model_output_dir)
+
+        return model
+    
+    def _train_ppo(self, model:PPO, device, train_loader, val_loader: Optional[DataLoader] = None, epochs=1, lr=1e-3, fold_id=0, output_dir="models_cv", patience=5, validation=False, GUI=False, sched_patience_batches=200):
+
+        optimizer = optim.Adam(model.policy.parameters(), lr=lr)
+        criterion = nn.MSELoss()
+        scheduler = ReduceLROnPlateau(
+            optimizer, mode="min", patience=patience, factor=0.2, verbose=True)
+
+        history = []
+        global_batch = 0
+        
+
+        for epoch in range(epochs):
+            model.policy.train()
+            total_loss = 0
+            start_time = time.time()
+            num_batches = len(train_loader)
+
+            n_batch_loss = 0
+            for i, (obs, target) in enumerate(train_loader, 1):
+                global_batch += 1
+   
+                obs = {k: v.to(model.policy.device) for k, v in obs.items()}
+                target = target.to(model.policy.device)
+                
+
+                features = model.policy.extract_features(obs)
+                latent_pi, _ = model.policy.mlp_extractor(features)
+                pred_actions = model.policy.action_net(latent_pi)
+
+                #print(f"Target: {target[0].cpu().numpy()} | Pred: {pred_actions[0].detach().cpu().numpy()}")
+
+                # sua loss customizada
+                loss = self.loss_mae_direction(pred_actions, target, w_mag=1, w_dir=100, w_raw_direction=60)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+
+                total_loss += loss.item() * target.size(0)
+                n_batch_loss += loss.item()
+
+                # === Scheduler step a cada N batches ===
+                if global_batch % sched_patience_batches == 0:
+                    print(
+                        f"Scheduler step at global batch {global_batch} with loss {n_batch_loss / sched_patience_batches:.6f}")
+                    scheduler.step(n_batch_loss / sched_patience_batches)
+                    print(
+                        f"Learning rate updated to: {optimizer.param_groups[0]['lr']}")
+                    n_batch_loss = 0
+
+                # ETA logging
+                if i % 50 == 0 or i == num_batches:
+                    elapsed = time.time() - start_time
+                    avg_time = elapsed / i
+                    eta = avg_time * (num_batches - i)
+                    print(f"[Fold {fold_id}][Epoch {epoch+1}] Batch {i}/{num_batches} " f"Loss: {loss.item():.6f} | ETA: {eta/60:.1f} min")
+                    print(f"Last target (u): {target[0].cpu().numpy()} | Last Pred: {pred_actions[0].detach().cpu().numpy()}")
+
+
+
+
+            # === Validação ===
+
+
+            history.append({
+                "epoch": epoch + 1,
+                "train_loss": total_loss / len(train_loader.dataset),
+
+            })
+
+            os.makedirs(output_dir, exist_ok=True)
+            model_path = os.path.join(output_dir, f"student_ppo_epoch{epoch+1}")
+            
+            model.save(os.path.join(output_dir, f"student_ppo_epoch{epoch+1}.zip"))
+
+            if validation:
+                self.evaluate_in_env(model, env=None, gui=GUI, max_steps=500)
+
+
+        # Salva histórico
+        df = pd.DataFrame(history)
+        csv_path = os.path.join(output_dir, f"history_fold{fold_id+1}.csv")
+        df.to_csv(csv_path, index=False)
+        print(f"[Fold {fold_id}] Histórico salvo em {csv_path}")
+        os.makedirs(output_dir, exist_ok=True)
+        model_path = os.path.join(output_dir, f"student_ppo_epoch{epoch+1}")
+        model.save(os.path.join(output_dir, f"student_ppo_final.zip"))
+        print(f"Model saved at {model_path}.zip")
+
+        return float("inf")
+
     
     def train_student(self, folder_path, observation_space, action_dim=4, epochs=1,
                       batch_size=256, lr=1e-3, model_output_dir="models_all", limit_size=500_000):
@@ -179,6 +297,7 @@ class SupervisedImitationTrainer:
     def _train(self, model, device, train_loader, val_loader: Optional[DataLoader] = None, epochs=1, lr=1e-3, fold_id=0, output_dir="models_cv", patience=5, validation=False, GUI=False, sched_patience_batches=200):
 
         optimizer = optim.Adam(model.parameters(), lr=lr)
+
         criterion = nn.MSELoss()
         scheduler = ReduceLROnPlateau(
             optimizer, mode="min", patience=patience, factor=0.2, verbose=True)

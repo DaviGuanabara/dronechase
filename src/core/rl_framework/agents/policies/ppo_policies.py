@@ -405,3 +405,4 @@ class StudentPolicy(ActorCriticPolicy):
         distribution = self.action_dist.proba_distribution(
             mean_actions, self.log_std)
         return distribution.get_actions(deterministic=deterministic)
+

@@ -156,22 +156,7 @@ def rl_pipeline(
     #)
 
     print(vectorized_environment.observation_space)
-    model = PPO(
-        "MultiInputPolicy",   # obrigatório para Dict obs
-        vectorized_environment,
-        policy_kwargs=dict(
-            features_extractor_class=StudentWithFLIA,
-            features_extractor_kwargs=dict(
-                features_dim=512   # só o que for extra
-            )
-        ),
-        learning_rate=3e-4,
-        batch_size=256,
-        verbose=1,
-        tensorboard_log=logs_dir
-    )
-
-
+    model = PPO.load("C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_models_all_3\\student_ppo_final.zip", env=vectorized_environment, device=device)
 
     lr_schedule = lambda _: learning_rate
     model.learning_rate = lr_schedule
