@@ -14,7 +14,7 @@ sys.path.append(grand_parent_directory)
 
 
 from core.utils.keyboard_listener import KeyboardListener
-from threatsense.level5.level5_c1_fusion_environment import Level5FusionEnvironment as Level5Fusion
+from threatsense.level5.level5_c1_fusion_environment import Level5C1FusionEnvironment as Level5Fusion
 print("Level 5 Fusion imported successfully.")
 
 print("Initializing Level 5 environment...")

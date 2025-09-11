@@ -24,6 +24,7 @@ from threatsense.level5.level5_dumb_multiobs import Level5DumbMultiObs
 from threatsense.level5.level5_fusion_environment import Level5FusionEnvironment as Level5Fusion
 from torch.utils.data import random_split
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import torch.nn.utils as nn_utils
 
 class StudentWithFLIA(nn.Module):
     def __init__(self, observation_space):
@@ -129,6 +130,22 @@ class SupervisedImitationTrainer:
 
         return model
     
+    def kill_high_correlation(self, obs, target, device):
+        """
+        O único que eu encontrei com uma alta correlação com a ação é o last_action.
+        pq é comum de sair repetindo ações, mas péssimo para a aprendizagem.
+        Vou deixar uma chance de 50% de sair aleatório.
+        
+        """
+
+        if np.random.rand() < 0.7:
+            batch_size = target.shape[0]
+            obs["last_action"] = torch.empty(
+                (batch_size, 4), dtype=torch.float32, device=device
+            ).uniform_(-1, 1)
+
+        return obs
+    
     def _train_ppo(self, model:PPO, device, train_loader, val_loader: Optional[DataLoader] = None, epochs=1, lr=1e-3, fold_id=0, output_dir="models_cv", patience=5, validation=False, GUI=False, sched_patience_batches=200):
 
         optimizer = optim.Adam(model.policy.parameters(), lr=lr)
@@ -149,7 +166,11 @@ class SupervisedImitationTrainer:
             n_batch_loss = 0
             for i, (obs, target) in enumerate(train_loader, 1):
                 global_batch += 1
-   
+
+                obs_original = obs
+
+                obs = self.kill_high_correlation(obs, target, device)
+                
                 obs = {k: v.to(model.policy.device) for k, v in obs.items()}
                 target = target.to(model.policy.device)
                 
@@ -165,7 +186,9 @@ class SupervisedImitationTrainer:
 
                 optimizer.zero_grad()
                 loss.backward()
+                nn_utils.clip_grad_norm_(model.policy.parameters(), max_norm=1.0)
                 optimizer.step()
+                optimizer.zero_grad()
 
 
                 total_loss += loss.item() * target.size(0)
@@ -186,6 +209,10 @@ class SupervisedImitationTrainer:
                     avg_time = elapsed / i
                     eta = avg_time * (num_batches - i)
                     print(f"[Fold {fold_id}][Epoch {epoch+1}] Batch {i}/{num_batches} " f"Loss: {loss.item():.6f} | ETA: {eta/60:.1f} min")
+                    #print("Inertial:",obs_original["inertial_data"][0].cpu().numpy())
+
+
+                    print("Last action:", obs_original["last_action"][0].cpu().numpy())
                     print(f"Last target (u): {target[0].cpu().numpy()} | Last Pred: {pred_actions[0].detach().cpu().numpy()}")
 
 

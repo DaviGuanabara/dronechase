@@ -445,105 +445,54 @@ class Level5C1FusionTask(Task):
     # Reward, Termination and INFO
     # ===============================================================================
 
-    def compute_reward(
-        self,
-        successful_rl_agent_shots=0,
-        successful_allies_shots=0,
-        pursuers_exploded=0,
-        pursuer_suicided=0,
-        agent_suicided=0,
-        allies_dead=0,   # opcional, default 0
-    ):
+    def compute_reward(self, successful_rl_agent_shots=0, successful_allies_shots=0, pursuers_exploded=0, pursuer_suicided=0, agent_suicided=0, allies_dead=0):
         """
-        COMPUTE REWARD ADAPTADO PARA ESSA TASK
+        Reward minimalista para engajamento do agente
         """
-        # componentes
-        score, bonus, penalty = 0.0, 0.0, 0.0
+        # Recupera agente e dados
         agent = self.entities_manager.get_agent()
-
         munition = agent.gun_state[0]
-        reload_progress = agent.gun_state[1]
         gun_available = agent.gun_state[2]
-
         position = agent.inertial_data["position"]
 
-        # segurança: inicializa last_closest_distance
-        if not hasattr(self, "last_closest_distance") or not np.isfinite(getattr(self, "last_closest_distance", np.inf)):
-            self.last_closest_distance = 1e9
-
-        distance_to_origin = float(np.linalg.norm(position))
-
-        # alvo: inimigo mais próximo do agente
+        # Alvo mais próximo
         target_id = self.offset_handler.identify_closest_invader(agent.id)
         target_position = np.array([0.0, 0.0, 0.0])
         if target_id > -1:
             target = self.entities_manager.get_quadcopters(id=target_id)[0]
             target_position = target.inertial_data["position"]
 
-        self.current_closest_distance = float(
-            np.linalg.norm(position - target_position)
-        )
+        distance = float(np.linalg.norm(position - target_position))
+
+        self.last_distance = distance if not hasattr(
+            self, 'last_distance') else self.last_distance
 
         # ----------------------
         # Parâmetros
-        SAFE_RADIUS = 5.0   # distância segura no reload
-        AGENT_KILL_W = 1.0   # peso para abates do agente
-        ALLY_COOP_W = 0.5   # crédito por abates de aliados
-        RELOAD_AWAY_W = 0.10  # bônus por se afastar no reload
-        RELOAD_RISK_W = 0.50  # penalidade se muito perto no reload
-        ALLY_DEAD_W = 0.75  # penalidade por aliado morto
-        SELF_DEATH_W = 2.0   # penalidade por morte própria
-        BORDER_W = 1.0   # peso da penalidade de borda
+        AGENT_KILL_W = 1.0   # recompensa por kill
+        SELF_DEATH_W = 2.0   # penalidade por suicídio
         # ----------------------
 
-        # Base: engajar quando arma pronta ou sem munição; recuar quando arma indisponível
-        if gun_available == 1 or munition == 0:
-            score = -self.current_closest_distance
-        else:
-            score = +self.current_closest_distance
-            if self.current_closest_distance < SAFE_RADIUS:
-                penalty += ((SAFE_RADIUS - self.current_closest_distance) /
-                            max(SAFE_RADIUS, 1e-6)) * (RELOAD_RISK_W * self.MAX_REWARD)
+        reward = 0.0
 
-        # Reload prudente: se aumentando distância durante reload, pequeno bônus
-        if (gun_available == 0 and munition > 0) and ((self.current_closest_distance - self.last_closest_distance) > 0.01):
-            bonus += RELOAD_AWAY_W * self.MAX_REWARD
+        if distance < self.last_distance:
+            velocity = agent.inertial_data.get("velocity", np.zeros(3))
+            reward += 10 * np.linalg.norm(velocity)
 
-        # Recompensas por abates
+        # 1) Shaping de distância
+        #reward = -distance if gun_available == 1 or munition == 0 else +distance
+        # 2) Evento de kill
         if successful_rl_agent_shots > 0:
-            bonus += AGENT_KILL_W * successful_rl_agent_shots * self.MAX_REWARD
+            reward += AGENT_KILL_W * successful_rl_agent_shots * self.MAX_REWARD
 
-        if (successful_allies_shots > 0) or (pursuer_suicided > 0):
-            bonus += ALLY_COOP_W * \
-                (successful_allies_shots + pursuer_suicided) * self.MAX_REWARD
-
-        # Penalidades
+        # 3) Penalidade por morte
         if agent_suicided > 0:
-            penalty += SELF_DEATH_W * agent_suicided * self.MAX_REWARD
+            reward -= SELF_DEATH_W * agent_suicided * self.MAX_REWARD
 
-        if allies_dead > 0:
-            penalty += ALLY_DEAD_W * allies_dead * self.MAX_REWARD
+        # Retorna reward limitado
+        return float(np.clip(reward, -3.0 * self.MAX_REWARD, 3.0 * self.MAX_REWARD))
 
-        if pursuers_exploded > 0:
-            penalty += self.MAX_REWARD * pursuers_exploded
-
-        if position[2] < -5.0:
-            scaling_factor = (-5.0 - position[2]) / 1.0
-            penalty += min(scaling_factor, 1.0) * self.MAX_REWARD
-
-        if len(self.offset_handler.identify_pursuer_outside_dome()) > 0:
-            penalty += self.MAX_REWARD
-
-        if distance_to_origin > self.ENEMY_BORN_RADIUS - 2:
-            overflow = distance_to_origin - (self.ENEMY_BORN_RADIUS - 2)
-            penalty += min(overflow * BORDER_W, self.MAX_REWARD)
-
-        # atualiza memória e retorna
-        self.last_closest_distance = self.current_closest_distance
-        total = score + bonus - penalty
-        return float(np.clip(total, -3.0 * self.MAX_REWARD, 3.0 * self.MAX_REWARD))
-
-
+   
 
     def compute_termination(self) -> bool:
         """Calculate if the simulation is done."""

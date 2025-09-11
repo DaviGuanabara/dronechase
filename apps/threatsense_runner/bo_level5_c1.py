@@ -15,9 +15,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import VecMonitor
 
 from core.rl_framework.agents.policies.ppo_policies import StudentPolicy, StudentWithFLIA
-from threatsense.level5.level5_c1_fusion_environment import (
-    Level5C1FusionEnvironment as level5_c1,
-)
+from threatsense.level5.level5_c1_fusion_environment import Level5C1FusionEnvironment as Level5C1Fusion
 
 
 from core.rl_framework.utils.pipeline import (
@@ -132,7 +130,7 @@ def rl_pipeline(
 
     vectorized_environment: VecMonitor = (
         ReinforcementLearningPipeline.create_vectorized_environment(
-            environment=level5_c1, env_kwargs=suggestions
+            environment=Level5C1Fusion, env_kwargs=suggestions, n_envs=4
         )
     )
 
@@ -156,7 +154,9 @@ def rl_pipeline(
     #)
 
     print(vectorized_environment.observation_space)
-    model = PPO.load("C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_models_all_3\\student_ppo_final.zip", env=vectorized_environment, device=device)
+    # "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_ppo_1\\student_ppo_final.zip"
+    model_path = "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\10.09.2025_trained_ppo_3\\student_ppo_final.zip"
+    model = PPO.load(model_path, env=vectorized_environment, device=device)
 
     lr_schedule = lambda _: learning_rate
     model.learning_rate = lr_schedule
@@ -222,10 +222,10 @@ def directories(study_name: str):
 
 def main():
     print("LEVEL 5 C1 EXP01 - Air Combat - 1RL and 1BT")
-    n_trials = 50
+    n_trials = 10
     n_timesteps = 2_000_000
     n_timesteps_in_millions = n_timesteps / 1e6
-    study_name = f"09_09_2025_level5_{n_timesteps_in_millions:.2f}M_exp01_p1"
+    study_name = f"10_09_2025_level5_{n_timesteps_in_millions:.2f}M_exp01_p2"
 
     print("Baysian Optimizer App - V2")
     print(f"number of trials: {n_trials}")

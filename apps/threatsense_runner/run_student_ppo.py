@@ -1,8 +1,9 @@
 # test_student.py
 import numpy as np
+from stable_baselines3 import PPO
 import torch
-from threatsense.level5.level5_fusion_environment import Level5FusionEnvironment as Level5Fusion
-from core.rl_framework.utils.sl_pipeline import StudentWithFLIA
+from threatsense.level5.level5_c1_fusion_environment import Level5C1FusionEnvironment as Level5Fusion
+
 
 
 def format_obs(obs, device):
@@ -16,16 +17,14 @@ def format_obs(obs, device):
             for k, v in obs.items()}
 
 
-def run_student(model_path, episodes=5, max_steps=500, gui=True):
+def run_student_ppo(model_path, episodes=5, max_steps=500, gui=True):
     # === Inicializa ambiente ===
     env = Level5Fusion(GUI=gui)
     observation_space = env.observation_space
 
     # === Carrega modelo treinado ===
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = StudentWithFLIA(observation_space).to(device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.eval()
+    model = PPO.load(model_path, env, device)  # Carrega o modelo PPO
 
     print(f"✅ Modelo carregado de {model_path}")
 
@@ -44,7 +43,7 @@ def run_student(model_path, episodes=5, max_steps=500, gui=True):
             obs_torch = format_obs(obs, device)
 
             with torch.no_grad():
-                action = model(obs_torch).cpu().numpy()[0]
+                action = model.predict(obs_torch)[0][0]
 
             print(action)
             print(f"Step {step+1}: Action taken: {action}")
@@ -65,9 +64,11 @@ def run_student(model_path, episodes=5, max_steps=500, gui=True):
 
 if __name__ == "__main__":
     model_path = (
-        # "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\trained_models_all\\models\\student_train_epoch5_5.pt"
-        # "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\07.09.2025_trained_models_all\\models\\student_last_model_0.pt"
-        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_models_all_3\\models\\student_last_model_0.pt"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_ppo_1\\student_ppo_final.zip"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\bo_level5_c1\\09_09_2025_level5_2.00M_exp01_p3\\Trial_0\\models_dir\\best_model.zip"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\bo_level5_c1\\09_09_2025_level5_2.00M_exp01_p3\\Trial_0\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t0_PPO_r-2579.20.zip"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\10.09.2025_trained_ppo_2\\student_ppo_final.zip"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\10.09.2025_trained_ppo_3\\student_ppo_final.zip"
+        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\bo_level5_c1\\10_09_2025_level5_2.00M_exp01_p2\\Trial_0\\models_dir\\best_model.zip"
     )
-    run_student(model_path, episodes=5, max_steps=500, gui=True)
-# folder_path = "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_ppo_1\\student_ppo_final.zip"
+    run_student_ppo(model_path, episodes=5, max_steps=500, gui=True)
