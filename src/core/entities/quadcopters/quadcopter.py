@@ -322,9 +322,9 @@ class Quadcopter:
    
             self.lidar.update_data()
             lidar_data = self.lidar.read_data()
-            if not hasattr(self, "_printed_once_read"):
-                print(f"[DEBUG] quadcopter read_data keys: {list(lidar_data.keys())}")
-                self._printed_once_read = True
+            #if not hasattr(self, "_printed_once_read"):
+            #    print(f"[DEBUG] quadcopter read_data keys: {list(lidar_data.keys())}")
+            #    self._printed_once_read = True
             
             self._update_flight_state(lidar_data)
             self._publish_lidar_data(lidar_data)
@@ -409,7 +409,14 @@ class Quadcopter:
         # - 6: vx, vy, vr, vz
         # - vp, vq, vr = angular velocities
         # - vx, vy, vz = ground linear velocities
+        self.last_motion_command = motion_command
         self.quadx.setpoint = self.convert_command_to_setpoint(motion_command)
+
+    @property
+    def last_action(self):
+        if hasattr(self, "last_motion_command"):
+            return self.last_motion_command
+        return np.zeros(4)
 
     # =================================================================================================================
     # Simulation Manager

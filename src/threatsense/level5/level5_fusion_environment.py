@@ -8,7 +8,7 @@ class Level5FusionEnvironment(Level5Environment):
 
     def init_task_progression(self):
         self.task_progression = TaskProgression(
-            TasksDispatcher.leve5_fusion(
+            TasksDispatcher.level5_fusion(
                 self.dome_radius, self.entities_manager)
         )
 

@@ -68,3 +68,9 @@ site/
 
 
 **/.DS_Store    
+apps/threatsense_runner/save_output_teste
+apps/threatsense_runner/save_output
+apps/threatsense_runner/03.09.2025_final_collect_and_save_output_part0.h5
+apps/threatsense_runner/collect_and_save_output_part0.h5
+*.csv
+pytorch3d/

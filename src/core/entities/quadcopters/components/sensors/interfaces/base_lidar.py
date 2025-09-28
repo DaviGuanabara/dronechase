@@ -66,6 +66,10 @@ class BaseLidar(Sensor):
 
     def buffer_step_broadcast(self, message: Dict, message_context: MessageContext):
         self.buffer_manager.update_current_step(message.get("step"))
+        if message.get("step") == 0:
+            #print(f"[LiDAR {self.parent_id}] Resetting buffer at step 0")
+            self.buffer_manager.reset(new_step=0)
+            #self.reset()
 
 
     def _buffer_data(self, message: Dict, message_context: MessageContext, topic: TopicsEnum):

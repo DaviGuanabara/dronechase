@@ -32,7 +32,7 @@ class Task(ABC):
     def on_episode_end(self):
         pass
 
-    def on_step_start(self):
+    def on_step_start(self, freeze_lw: bool = False):
         """
         Here lies the methods that should be executed BEFORE the STEP.
         It aims to set the environment to the simulation step execution.
@@ -103,9 +103,10 @@ class TaskProgression:
         """Called at the end of each episode."""
         self.current_stage.on_episode_end()
 
-    def on_step_start(self):
+    def on_step_start(self, freeze_lw: bool = False):
         """Called at the start of each step."""
-        self.current_stage.on_step_start()
+
+        self.current_stage.on_step_start(freeze_lw=freeze_lw)
 
     def on_step_middle(self) -> Tuple[float, bool]:
         """Execute actions before observation and reward."""

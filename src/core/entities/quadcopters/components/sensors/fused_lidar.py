@@ -226,10 +226,10 @@ class FusedLIDAR(BaseLidar):
         if self.debug:
             self.render_lidar_debug_rays()
 
-        if not self.activate_fusion:
-            #print(
-            #    f"[DEBUG] Fusion not active yet for {self.parent_id} at step {getattr(self, 'current_step', 'N/A')}")
-            return {"sphere": self.sphere, "features": self.features}
+        #TODO: FOR MULTIOBS, I HAVE TO RETURN THE COMPLETE OBSERVATION OF FUSED LIDAR
+        #ABRIR AS PORTAS AQUI
+        #if not self.activate_fusion:
+        #    return {"sphere": self.sphere, "features": self.features}
         
         self.sphere_stack = self._build_valid_spheres()
         self.padded_stack, self.mask = self._pad_sphere_stack(self.sphere_stack)

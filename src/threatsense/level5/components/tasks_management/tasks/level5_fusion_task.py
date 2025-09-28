@@ -83,7 +83,7 @@ class Level5FusionTask(Task):
         n_invaders_to_activate = (current_round - 1) * self.INVADERS_PER_ROUND + self.INITIAL_NUMBER_OF_INVADERS
         """
 
-        self.NUM_PURSUERS = 10 + 1  # +1 for the agent
+        self.NUM_PURSUERS = 5 + 1  # +1 for the agent
         self.INVADERS_PER_ROUND = 5
         self.INITIAL_NUMBER_OF_INVADERS = 5
         self.MAX_NUM_INVADERS = 30
@@ -297,7 +297,7 @@ class Level5FusionTask(Task):
 
         self.entities_manager.disarm_all()
 
-    def on_step_start(self):
+    def on_step_start(self, freeze_lw: bool = False):
         """
         Here lies the methods that should be executed BEFORE the STEP.
         It aims to set the environment to the simulation step execution.
@@ -305,7 +305,8 @@ class Level5FusionTask(Task):
         #print("on step start")
         #print(f"[DEBUG] Level5FusionTask on_step_start - current_step: {self.current_step}")
         self.drive_invaders()
-        self.drive_loyalwingmen()
+        if not freeze_lw:
+            self.drive_loyalwingmen()
 
     def on_step_middle(self):
         """

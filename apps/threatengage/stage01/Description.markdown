@@ -1,1 +1,0 @@
-Baysian_v_old_modified_v2.py is the final file used to train the neural network 
