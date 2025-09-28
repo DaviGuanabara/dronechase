@@ -2,6 +2,12 @@
 # Dronechase
 
 
+
+Read-me outdated. 
+Maintenance in progress.
+I appreciate your patience. 
+
+
 pip install .[interactive]
 
 **Dronechase** is a multi-stage simulation framework for training autonomous aerial agents in defense scenarios using Deep Reinforcement Learning (DRL). The project focuses on **loyal wingmen drones** engaging loitering munitions in a 3D physics-based environment powered by PyBullet.
