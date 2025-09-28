@@ -6,7 +6,7 @@ import torch
 from threatsense.level5.level5_dumb_multiobs import Level5DumbMultiObs
 import os
 import time
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 
 
 class MultiH5Dataset(Dataset):
@@ -166,6 +166,19 @@ class IOData():
     def get_loader(self, batch_size=1024, shuffle=True) -> DataLoader:
 
         return self._custom_loader(self.dataset, batch_size, shuffle)
+    
+    def get_loader_limit(self, limit_size=1_000_000, batch_size=1024, shuffle=True, rng=None) -> DataLoader:
+        
+
+        rng = np.random.default_rng(42) if rng is None else rng
+        dataset = self.dataset
+        indices = rng.choice(len(dataset), size=limit_size, replace=False)
+        subset = Subset(dataset, indices) # type: ignore
+
+        return DataLoader(
+            subset, batch_size=batch_size, shuffle=True,
+            num_workers=8, pin_memory=True, persistent_workers=True
+        )
     
     def _custom_loader(self, dataset, batch_size=1024, shuffle=True) -> DataLoader:
 

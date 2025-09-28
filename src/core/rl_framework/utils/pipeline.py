@@ -127,6 +127,7 @@ class ReinforcementLearningPipeline:
         n_eval_episodes: int = 10,
         debug: bool = False,
         steps=1_000_000,
+        step_size_save=100_000
     ):
         if callbacks_to_include is None:
             callbacks_to_include = [
@@ -134,7 +135,9 @@ class ReinforcementLearningPipeline:
                 CallbackType.CHECKPOINT,
                 CallbackType.PROGRESSBAR,
             ]
-        save_freq = int(steps / 10)
+        save_freq = max(step_size_save if steps >
+                        step_size_save else steps // 10, 1)
+
         return callbacklist(
             vectorized_environment,
             log_path=log_dir,
@@ -245,7 +248,7 @@ class ReinforcementLearningPipeline:
         device: str,
         tensorboard_log: str,
         debug=False,
-    ) -> PPO:
+    )-> SAC:
         """
         Creates a PPO model with the given parameters
         CustomActorCriticPolicy is used as the policy. It receives the CustomNetwork as MLP

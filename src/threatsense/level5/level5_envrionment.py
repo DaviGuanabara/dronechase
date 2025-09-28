@@ -48,6 +48,7 @@ class Level5Environment(Env):
         dome_radius: float = 20,
         rl_frequency: int = 15,
         GUI: bool = False,
+        Teacher_Student: bool = True,
     ):
         """Initialize the environment."""
         print("Init Level 5 Environment Init ThreatSense level 5 environment")
@@ -67,8 +68,9 @@ class Level5Environment(Env):
         #self.task_progression.on_episode_start()
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
-        self.teacher_observation_space = self._teacher_observation_space()
-        self.student_observation_space = self._student_observation_space()
+        if Teacher_Student:
+            self.teacher_observation_space = self._teacher_observation_space()
+            self.student_observation_space = self._student_observation_space()
 
     def _teacher_observation_space(self):
         observation_shape = self.observation_shape()

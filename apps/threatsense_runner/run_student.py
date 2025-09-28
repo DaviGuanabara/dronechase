@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 from threatsense.level5.level5_fusion_environment import Level5FusionEnvironment as Level5Fusion
-from core.rl_framework.utils.sl_pipeline import StudentWithFLIA
+
 
 
 def format_obs(obs, device):
@@ -67,7 +67,8 @@ if __name__ == "__main__":
     model_path = (
         # "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\trained_models_all\\models\\student_train_epoch5_5.pt"
         # "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\07.09.2025_trained_models_all\\models\\student_last_model_0.pt"
-        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_models_all_3\\models\\student_last_model_0.pt"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_models_all_3\\models\\student_last_model_0.pt"
+        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\sl\\12.09.2025\\train_sl_9\\model.zip"
     )
     run_student(model_path, episodes=5, max_steps=500, gui=True)
 # folder_path = "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\09.09.2025_trained_ppo_1\\student_ppo_final.zip"

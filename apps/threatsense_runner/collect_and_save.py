@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     episode_start_time = time.time()
 
-    dir_path = Path("output/collect_and_save/09.09.2025_office")
+    dir_path = Path("output/collect_and_save/08.09.2025")
     dir_path.mkdir(parents=True, exist_ok=True)
 
 

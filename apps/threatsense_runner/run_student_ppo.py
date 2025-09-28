@@ -69,6 +69,8 @@ if __name__ == "__main__":
         #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\bo_level5_c1\\09_09_2025_level5_2.00M_exp01_p3\\Trial_0\\models_dir\\h[128, 256, 512]_f15_lr0.0001\\t0_PPO_r-2579.20.zip"
         #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\10.09.2025_trained_ppo_2\\student_ppo_final.zip"
         #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\10.09.2025_trained_ppo_3\\student_ppo_final.zip"
-        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\bo_level5_c1\\10_09_2025_level5_2.00M_exp01_p2\\Trial_0\\models_dir\\best_model.zip"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\bo_level5_c1\\10_09_2025_level5_2.00M_exp01_p2\\Trial_0\\models_dir\\best_model.zip"
+        #"C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\sl\\12.09.2025\\train_sl_9\\model.zip"
+        "C:\\Users\\davi_\\Documents\\GitHub\\dronechase\\apps\\threatsense_runner\\output\\rl\\13.09.2025\\train_rl_1\\models\\final.zip"
     )
     run_student_ppo(model_path, episodes=5, max_steps=500, gui=True)
