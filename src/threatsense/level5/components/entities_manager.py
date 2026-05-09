@@ -35,7 +35,9 @@ class EntitiesManager:
     def _initialize(self) -> None:
         """Initialize attributes for the instance."""
         self.drone_registry: Dict[int, Quadcopter] = {}
-        self.kamikaze_navigator = KamikazeNavigator(np.array([0, 0, 1]))
+        self.kamikaze_navigator = KamikazeNavigator(
+            np.array([0, 0, 1], dtype=np.float32)
+        )
         self.debug = False
 
         self.agent_id = -1
@@ -70,6 +72,7 @@ class EntitiesManager:
         lidar_radius: float = DEFAULT_LIDAR_RADIUS,
         use_fused_lidar: bool = True,
     ) -> List[Quadcopter]:
+        positions = np.asarray(positions, dtype=np.float32)
         # Check if names is a list, if not, convert it to a list
         if not isinstance(names, list):
             names = [names]
@@ -93,13 +96,13 @@ class EntitiesManager:
                     use_fused_lidar=use_fused_lidar,
                 )
             else:
-                #TODO: LIDAR ON LOITERING MUNITION SHOULD BE OFF, IS NOT ?
+                # TODO: LIDAR ON LOITERING MUNITION SHOULD BE OFF, IS NOT ?
                 drone = Quadcopter.spawn_loiteringmunition(
                     self.simulation,
                     position,
                     name,
                     debug_on=False,
-                    lidar_on=False, #lidar_on must be off for loitering munition. It were True
+                    lidar_on=False,  # lidar_on must be off for loitering munition. It were True
                     lidar_radius=lidar_radius,
                 )
 
@@ -118,7 +121,7 @@ class EntitiesManager:
         use_fused_lidar=True
     ) -> List[Quadcopter]:
 
-        #print("[DEBUG] EntitiesManager: spawning pursuer")
+        # print("[DEBUG] EntitiesManager: spawning pursuer")
 
         return self.spawn_quadcopter(
             positions, EntityType.LOYALWINGMAN, names, lidar_radius, use_fused_lidar=use_fused_lidar
@@ -134,10 +137,12 @@ class EntitiesManager:
     # ===========================================================================
 
     def spawn_ground(self, dome_radius: float):
+
+        print("To optmize, the ground should not be spawned.")
         # TODO: IT IS HARD CODED INTO THE TASK. I HAVE TO CHANGE IT.
-        self.ground = ImmovableStructures.spawn_ground(
-            self.simulation, [0, 0, -6], dome_radius
-        )
+        # self.ground = ImmovableStructures.spawn_ground(
+        #    self.simulation, [0, 0, -6], dome_radius
+        # )
 
     def spawn_protected_building(self):
         # self.building = ImmovableStructures.spawn_building(self.simulation, [0, 0, 0])
@@ -154,11 +159,11 @@ class EntitiesManager:
         armed: Optional[bool],
         id: Optional[int],
     ) -> bool:
-        return all([
-            quadcopter_type is None or drone.quadcopter_type == quadcopter_type,
-            armed is None or drone.armed == armed,
-            id is None or drone.id == id,
-        ])
+        return (
+            (quadcopter_type is None or drone.quadcopter_type == quadcopter_type)
+            and (armed is None or drone.armed == armed)
+            and (id is None or drone.id == id)
+        )
 
     def get_quadcopters(
         self,
@@ -167,10 +172,17 @@ class EntitiesManager:
         armed: Optional[bool] = None,
         id: Optional[int] = None,
     ) -> List[Quadcopter]:
-        drones = list(self.drone_registry.values())
+        if id is not None:
+            drone = self.drone_registry.get(id)
+            if drone is None:
+                return []
+            return [
+                drone
+            ] if self.filter_expression(drone, quadcopter_type, armed, id) else []
+
         return [
             drone
-            for drone in drones
+            for drone in self.drone_registry.values()
             if self.filter_expression(drone, quadcopter_type, armed, id)
         ]
 
@@ -220,21 +232,21 @@ class EntitiesManager:
             self.disarm_by_quadcopter(self.drone_registry[id])
 
     def arm_all(self):
-        for drone in list(self.drone_registry.values()):
+        for drone in self.drone_registry.values():
             # print(f"Arming Quadcopter {drone.id}")
             self.arm_by_quadcopter(drone)
 
     def arm_all_pursuers(self):
-        for drone in list(self.drone_registry.values()):
+        for drone in self.drone_registry.values():
             if drone.quadcopter_type == EntityType.LOYALWINGMAN:
                 self.arm_by_quadcopter(drone)
 
     def disarm_all(self):
-        for drone in list(self.drone_registry.values()):
+        for drone in self.drone_registry.values():
             self.disarm_by_quadcopter(drone)
 
     def disarm_all_invaders(self):
-        for drone in list(self.drone_registry.values()):
+        for drone in self.drone_registry.values():
             if drone.quadcopter_type == EntityType.LOITERINGMUNITION:
                 self.disarm_by_quadcopter(drone)
 
@@ -328,11 +340,15 @@ class EntitiesManager:
         self,
         drone: Quadcopter,
         position: np.ndarray,
-        attitude: np.ndarray = np.zeros(3),
+        attitude: np.ndarray | None = None,
     ):
+        if attitude is None:
+            attitude = np.zeros(3, dtype=np.float32)
+
         drone.replace(position, attitude)
 
     def replace_quadcopters(self, drones: List[Quadcopter], positions: np.ndarray):
+        positions = np.asarray(positions, dtype=np.float32)
         for drone, position in zip(drones, positions):
             self.replace_quadcopter(drone, position)
 

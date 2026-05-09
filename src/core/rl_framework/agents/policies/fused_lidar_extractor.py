@@ -7,7 +7,7 @@ import gymnasium as gym
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch.nn.functional as F
 from torch_geometric.nn import GATConv
-from pytorch3d.ops import knn_points
+
 
 class MLPBlock(nn.Module):
     """
@@ -24,7 +24,7 @@ class MLPBlock(nn.Module):
     Attributes:
         layer_norm (nn.LayerNorm): Layer normalization for stable training.
 
-        
+
         |-> Although batch norm is commomly used, it requires large mini batches for its
         |-> math works properly. Normaly this happens in Supervised Learning, 
         |-> but in RL, we normally have smaller batches (e.g., 32, 64, maybe 1).
@@ -46,7 +46,7 @@ class MLPBlock(nn.Module):
         use_dropout=False,
     ):
         super(MLPBlock, self).__init__()
-        #self.batch_norm = nn.BatchNorm1d(num_features=input_dim)
+        # self.batch_norm = nn.BatchNorm1d(num_features=input_dim)
         self.layer_norm = nn.LayerNorm(input_dim)
         self.linear = nn.Linear(input_dim, output_dim, bias=False)
         self.activation = activation_function
@@ -64,7 +64,7 @@ class MLPBlock(nn.Module):
             activation (if applicable), and dropout (if applicable).
         """
 
-        x = self.layer_norm(x) #if x.size(0) > 1 else x
+        x = self.layer_norm(x)  # if x.size(0) > 1 else x
         x = self.linear(x)
         x = self.activation(x) if self.activation is not None else x
         x = self.dropout(x) if self.dropout is not None else x
@@ -207,21 +207,21 @@ class MLPomega(nn.Module):
 
         # [batch_size, num_neighbors] -> [batch_size * num_neighbors]
         mask = mask.to(tensor.device).bool()
-        #print(f"[DEBUG] ApplyMask -> Mask {mask.shape}, Tensor {tensor.shape}")
+        # print(f"[DEBUG] ApplyMask -> Mask {mask.shape}, Tensor {tensor.shape}")
 
         mask_expanded = mask.view(-1, 1).expand_as(tensor)
         fill_value = torch.finfo(tensor.dtype).min
         return tensor.masked_fill(~mask_expanded, fill_value)
 
-        #mask_flat = mask.view(-1)
+        # mask_flat = mask.view(-1)
 
         # [batch_size * num_neighbors, 1]
-        #mask_flat = mask_flat.unsqueeze(1)
+        # mask_flat = mask_flat.unsqueeze(1)
 
         # [batch_size * num_neighbors, hidden]
-        #mask_expanded = mask_flat.expand(-1, tensor.size(1))
+        # mask_expanded = mask_flat.expand(-1, tensor.size(1))
 
-        #return tensor.masked_fill(mask_expanded == 0, mask_value)
+        # return tensor.masked_fill(mask_expanded == 0, mask_value)
 
     def _grant_at_least_one_valid(self, mask: Tensor) -> Tensor:
         """
@@ -255,15 +255,15 @@ class MLPomega(nn.Module):
             containing normalized attention weights.
         """
 
-        #print(f"[DEBUG] Omega forward -> Observation shape: {Observation.shape}, Mask shape: {mask.shape}")
+        # print(f"[DEBUG] Omega forward -> Observation shape: {Observation.shape}, Mask shape: {mask.shape}")
         if mask is not None:
             mask = self._grant_at_least_one_valid(mask)
 
         # (batch * neighbors, features)
         batch_size, num_neighbors, _ = Observation.shape
 
-        
-        Observation_flat = Observation.reshape(-1, self.input_dim) # [B, N, cnn_out] -> [B*N, input_dim]
+        # [B, N, cnn_out] -> [B*N, input_dim]
+        Observation_flat = Observation.reshape(-1, self.input_dim)
 
         input_block_1 = Observation_flat
         output_block_1 = self.omega_block_1(input_block_1)
@@ -274,8 +274,9 @@ class MLPomega(nn.Module):
         input_block_3 = output_block_2 + input_block_2
         output_block_3 = self.omega_block_3(input_block_3)  # [B*N, hidden]
 
-        #print(f"[DEBUG] Omega forward -> Output block 3 shape: {output_block_3.shape}")
-        output_block_3_masked = self.apply_mask(output_block_3, mask)  # [B*N, 1]
+        # print(f"[DEBUG] Omega forward -> Output block 3 shape: {output_block_3.shape}")
+        output_block_3_masked = self.apply_mask(
+            output_block_3, mask)  # [B*N, 1]
 
         output_reviewed = output_block_3_masked.reshape(
             batch_size, num_neighbors, self.output_dim)
@@ -336,7 +337,7 @@ class MLPtheta(nn.Module):
             use_dropout=False,
         )
 
-    def forward(self, aggregated_features): #, num_neighbors):
+    def forward(self, aggregated_features):  # , num_neighbors):
         """
         Performs the forward pass of the MLPtheta.
 
@@ -347,7 +348,7 @@ class MLPtheta(nn.Module):
             torch.Tensor: Output tensor of shape (batch_size, 1).
         """
 
-        #batch_size, _ = aggregated_features.shape
+        # batch_size, _ = aggregated_features.shape
 
         # (batch * neighbors, features)
         u_flat = aggregated_features.reshape(-1, self.input_dim)
@@ -399,8 +400,10 @@ class CellGNN(nn.Module):
         num_nodes_per_batch = N * M
 
         # distâncias: [B, N*M, N*M]
-        knn = knn_points(coords, coords, K=k+1)  # retorna dists e idx
-        knn_idx = knn.idx[:, :, 1:]  # ignora self
+        dists = torch.cdist(coords, coords)
+        knn_idx = torch.topk(dists, k=k+1, dim=-1,
+                             largest=False).indices[:, :, 1:]
+
         # top-k índices por batch: [B, N*M, k]
 
         # cria índices base [0..N*M-1], expandido no batch
@@ -418,7 +421,8 @@ class CellGNN(nn.Module):
         dst = knn_idx + batch_offsets        # [B, N*M, k]
 
         # concatena
-        edge_index = torch.stack([src.reshape(-1), dst.reshape(-1)], dim=0)  # [2, E]
+        edge_index = torch.stack(
+            [src.reshape(-1), dst.reshape(-1)], dim=0)  # [2, E]
         return edge_index.to(coords.device)
 
     def forward(self, x):
@@ -507,7 +511,6 @@ class AttentionPooling(nn.Module):
         return self.proj(pooled)  # [B, M, H_out]
 
 
-
 class DeepSetSingleWorldView(nn.Module):
     """
     Entrada: [B, M, H_pool]
@@ -563,7 +566,6 @@ class DeepSetSingleWorldView(nn.Module):
         return self.mlp_theta(agg)                    # [B, output_dim]
 
 
-
 class DeepSetAttentionNet(nn.Module):
     """
     Neural network model implementing a Deep Set Attention mechanism with three main components:
@@ -611,11 +613,14 @@ class DeepSetAttentionNet(nn.Module):
     def __init__(self, input_dim, hidden, output_dim, prob=0.5):
         super(DeepSetAttentionNet, self).__init__()
 
-        #TODO: Mudar para termos input_dim e output_dim
-        #PHi e Omega devem ter output_dim ?
-        self.mlp_phi = MLPphi(input_dim=input_dim, output_dim=hidden, prob=prob)
-        self.mlp_omega = MLPomega(input_dim=input_dim, output_dim=hidden, prob=prob)
-        self.mlp_theta = MLPtheta(input_dim=hidden, hidden=hidden, output_dim=output_dim, prob=prob)
+        # TODO: Mudar para termos input_dim e output_dim
+        # PHi e Omega devem ter output_dim ?
+        self.mlp_phi = MLPphi(input_dim=input_dim,
+                              output_dim=hidden, prob=prob)
+        self.mlp_omega = MLPomega(
+            input_dim=input_dim, output_dim=hidden, prob=prob)
+        self.mlp_theta = MLPtheta(
+            input_dim=hidden, hidden=hidden, output_dim=output_dim, prob=prob)
 
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -652,19 +657,21 @@ class DeepSetAttentionNet(nn.Module):
 
 class HybridPadConv2d(nn.Module):
     """Conv2d with circular padding on W axis (Azimuth)."""
-    #TODO: Reler sobre como isso aqui funciona
+    # TODO: Reler sobre como isso aqui funciona
 
     def __init__(self, in_ch, out_ch, kernel_size=(3, 3), stride=(1, 1), bias=True):
         super().__init__()
 
         self.NO_VALUE = 1  # Its like a "no data" value for LIDAR, used in padding
-        kh, kw = (kernel_size if isinstance(kernel_size, tuple)else (kernel_size, kernel_size))
+        kh, kw = (kernel_size if isinstance(kernel_size, tuple)
+                  else (kernel_size, kernel_size))
         sh, sw = (stride if isinstance(stride, tuple) else (stride, stride))
 
         self.pad_w = (kw - 1) // 2
         self.pad_h = (kh - 1) // 2
 
-        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=(kh, kw), stride=(sh, sw), padding=(0, 0), bias=bias)
+        self.conv = nn.Conv2d(in_ch, out_ch, kernel_size=(
+            kh, kw), stride=(sh, sw), padding=(0, 0), bias=bias)
 
     def forward(self, x):
 
@@ -672,8 +679,10 @@ class HybridPadConv2d(nn.Module):
             x = F.pad(x, (self.pad_w, self.pad_w, 0, 0), mode="circular")
 
         if self.pad_h > 0:
-            x = F.pad(x, (0, 0, self.pad_h, self.pad_h),mode="constant", value=self.NO_VALUE)
+            x = F.pad(x, (0, 0, self.pad_h, self.pad_h),
+                      mode="constant", value=self.NO_VALUE)
         return self.conv(x)
+
 
 class SphereCNN(nn.Module):
     """CNN shared for each sphere.
@@ -690,7 +699,7 @@ class SphereCNN(nn.Module):
         |-> W: width of the matrix (n_phi, azimuthal angle resolution).
 
         - output_dim: dimension of the output feature vector for each sphere.
-        
+
         """
         super().__init__()
 
@@ -703,11 +712,11 @@ class SphereCNN(nn.Module):
         self.block2 = nn.Sequential(HybridPadConv2d(
             in_ch=conv1_output, out_ch=conv2_output, kernel_size=(3, 3), stride=(2, 2)), nn.ReLU())
         self.flatten = nn.Flatten()
-        
 
         # descobrir dimensão dinamicamente
         with torch.no_grad():
-            sample = torch.rand(1, input_channels, height, width)  # H,W só exemplo
+            sample = torch.rand(1, input_channels, height,
+                                width)  # H,W só exemplo
             output_block1 = self.block1(sample)
             output_block2 = self.block2(output_block1)
             n_flatten = self.flatten(output_block2).shape[1]
@@ -790,14 +799,11 @@ class SphereCNNCells(nn.Module):
         feat = self.proj(feat)            # [B*N, C, H2, W2]
         feat = feat.flatten(2)            # [B*N, C, H2*W2]
 
-
         feat = self.adapt(feat)       # [B*N, C, M]
 
         # separa de volta
         feat = feat.view(B, N, C, self.M)  # [B, N, C, M]
         return feat
-
-
 
 
 class CNNDeepSetAttentionNet(nn.Module):
@@ -812,13 +818,13 @@ class CNNDeepSetAttentionNet(nn.Module):
         |-> H: height of the matrix (n_theta, polar angle resolution).
         |-> W: width of the matrix (n_phi, azimuthal angle resolution).
 
-        
+
         """
         super().__init__()
         self.output_dim = output_dim
         self.sphere_cnn = SphereCNN(input_shape, output_dim=hidden)
-        self.deepset = DeepSetAttentionNet(input_dim=hidden, hidden=hidden, output_dim=output_dim, prob=prob)
-        
+        self.deepset = DeepSetAttentionNet(
+            input_dim=hidden, hidden=hidden, output_dim=output_dim, prob=prob)
 
     def forward(self, observation, mask):
         """
@@ -831,9 +837,9 @@ class CNNDeepSetAttentionNet(nn.Module):
         H: height -> polar angle
         W: width -> azimuthal angle
         """
-        #B, N, C, H, W = observation.shape
+        # B, N, C, H, W = observation.shape
 
-        #print(f"[DEBUG] CNNDeepSetAttentionNet 1 -> Observation shape: {observation.shape}, Mask shape: {mask.shape}")
+        # print(f"[DEBUG] CNNDeepSetAttentionNet 1 -> Observation shape: {observation.shape}, Mask shape: {mask.shape}")
 
         # Aceita [B, N, C, H, W] ou [N, C, H, W]
         if observation.dim() == 5:
@@ -849,18 +855,20 @@ class CNNDeepSetAttentionNet(nn.Module):
             elif mask.dim() == 2 and mask.shape[0] == 1:
                 pass                     # já está [1,N]
             else:
-                raise ValueError(f"Inconsistent mask for B=1,N={N}: {mask.shape}")
+                raise ValueError(
+                    f"Inconsistent mask for B=1,N={N}: {mask.shape}")
         else:
             raise ValueError(f"Unexpected lidar shape: {observation.shape}")
 
-        #print(f"mask: {mask}")        
+        # print(f"mask: {mask}")
         # 1 sphere by time -> batch x neighbors
-        #print(f"[DEBUG] CNNDeepSetAttentionNet 2 -> Observation shape: {observation.shape}, Mask shape: {mask.shape}")
+        # print(f"[DEBUG] CNNDeepSetAttentionNet 2 -> Observation shape: {observation.shape}, Mask shape: {mask.shape}")
         x = observation.reshape(B*N, C, H, W)
-        sphere_features = self.sphere_cnn(x).reshape(B, N, -1)  # [B*N, cnn_out] -> [B, N, cnn_out]
+        sphere_features = self.sphere_cnn(x).reshape(
+            B, N, -1)  # [B*N, cnn_out] -> [B, N, cnn_out]
 
-        #print(
-            #f"[DEBUG] CNNDeepSetAttentionNet 3 -> sphere_features shape: {sphere_features.shape}, Mask shape: {mask.shape}")
+        # print(
+        # f"[DEBUG] CNNDeepSetAttentionNet 3 -> sphere_features shape: {sphere_features.shape}, Mask shape: {mask.shape}")
         return self.deepset.forward(sphere_features, mask)  # mask = [B, N]
 
 
@@ -883,16 +891,21 @@ class SingleWorldViewNet(nn.Module):
         self.output_dim = output_dim
 
         # CNN gera embeddings por célula (mantém C, reduz HxW -> M células)
-        self.sphere_cnn = SphereCNNCells(input_shape, M=M, conv_channels=(32, 64))
+        self.sphere_cnn = SphereCNNCells(
+            input_shape, M=M, conv_channels=(32, 64))
         sphere_cnn_output_shape = self.sphere_cnn.output_shape()  # (B, N, C, M)
 
         # GNN relaciona células (intra-vizinhos e inter-vizinhos)
-        self.cell_gnn = CellGNN(input_shape=sphere_cnn_output_shape, k=5, hidden_dim=hidden)
-        self.cell_gnn_output_shape = self.cell_gnn.output_shape()  # (B, N, M, H_gnn) h_gnn = hidden
+        self.cell_gnn = CellGNN(
+            input_shape=sphere_cnn_output_shape, k=5, hidden_dim=hidden)
+        # (B, N, M, H_gnn) h_gnn = hidden
+        self.cell_gnn_output_shape = self.cell_gnn.output_shape()
 
         # Pooling colapsa os vizinhos (N -> 1)
-        self.cell_pool = AttentionPooling(input_shape=self.cell_gnn_output_shape, hidden_dim=hidden)
-        self.cell_pool_output_shape = self.cell_pool.output_shape()  # (B, M, H_pool) h_pool = hidden
+        self.cell_pool = AttentionPooling(
+            input_shape=self.cell_gnn_output_shape, hidden_dim=hidden)
+        # (B, M, H_pool) h_pool = hidden
+        self.cell_pool_output_shape = self.cell_pool.output_shape()
 
         # DeepSet agrega as células (M -> embedding final)
         self.deepset = DeepSetSingleWorldView(
@@ -912,7 +925,7 @@ class SingleWorldViewNet(nn.Module):
         # Aglutina a posição 2D para 1D (H,W -> M)
         # Saída: [B, N, C, M]
         # Propósito: reduzir o tamanho espacial.
-        cnn_out = self.sphere_cnn(x)  
+        cnn_out = self.sphere_cnn(x)
 
         # GNN -> células interconectadas
         # Contrói grafo KNN entre células (intra e inter-vizinhos)
@@ -938,7 +951,7 @@ class SingleWorldViewExtractor(BaseFeaturesExtractor):
 
         # --- Lidar ---
         lidar_space = observation_space["stacked_spheres"]   # (N, C, H, W)
-        N, C, H, W = lidar_space.shape # type: ignore
+        N, C, H, W = lidar_space.shape  # type: ignore
         self.lidar_feature_extractor, n_flatten_lidar = self._preprocess_lidar(
             (1, N, C, H, W), output_dim=128
         )
@@ -947,8 +960,8 @@ class SingleWorldViewExtractor(BaseFeaturesExtractor):
         inertial = observation_space["inertial_data"]
         action = observation_space["last_action"]
 
-
-        self.unified_extractor, n_flatten_unified = self._unified_preprocess(inertial, action)
+        self.unified_extractor, n_flatten_unified = self._unified_preprocess(
+            inertial, action)
 
         # --- Final Layer ---
         concatenated_dim = n_flatten_lidar + n_flatten_unified
@@ -980,9 +993,9 @@ class SingleWorldViewExtractor(BaseFeaturesExtractor):
             nn.ReLU(),
         )
         with torch.no_grad():
-            out_dim = extractor(torch.rand(1, inertial.shape[0] + action.shape[0])).shape[1]
+            out_dim = extractor(torch.rand(
+                1, inertial.shape[0] + action.shape[0])).shape[1]
         return extractor, out_dim
-    
 
     def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
         lidar_observation = observations["stacked_spheres"]   # [B, N, C, H, W]
@@ -990,10 +1003,10 @@ class SingleWorldViewExtractor(BaseFeaturesExtractor):
         inertial_data = observations["inertial_data"]         # [B, D_inertial]
         action = observations["last_action"]                  # [B, D_action]
 
-
-        lidar_features = self.lidar_feature_extractor(lidar_observation, lidar_mask)
-        unified_features = self.unified_extractor(torch.cat((inertial_data, action), dim=1))
-
+        lidar_features = self.lidar_feature_extractor(
+            lidar_observation, lidar_mask)
+        unified_features = self.unified_extractor(
+            torch.cat((inertial_data, action), dim=1))
 
         concatenated_features = torch.cat(
             (lidar_features, unified_features),
@@ -1002,30 +1015,32 @@ class SingleWorldViewExtractor(BaseFeaturesExtractor):
         return self.final_layer(concatenated_features)
 
 
-
-
 class FLIAExtractor(BaseFeaturesExtractor):
-    #Fused Lidar, Inertial and Action Extractor
+    # Fused Lidar, Inertial and Action Extractor
     def __init__(self, observation_space: gym.spaces.Dict, features_dim: int = 512):
         # super(LidarInertialActionExtractor, self).__init__()
-        #print("FLIAExtractor: Using Fused Lidar, Inertial and Action Extractor")
-        #print("[Warning] Gun observation key is not processed here (the key is not, but is expected Gun observation together in inertial_data)")
+        # print("FLIAExtractor: Using Fused Lidar, Inertial and Action Extractor")
+        # print("[Warning] Gun observation key is not processed here (the key is not, but is expected Gun observation together in inertial_data)")
         super().__init__(observation_space, features_dim)
 
         lidar = observation_space["stacked_spheres"]  # [B, N, C, H, W]
         mask = observation_space["validity_mask"]   # [B, N]
 
-        #print(f"[DEBUG] FLIAExtractor -> Lidar shape: {lidar.shape}, Mask shape: {mask.shape}")
-        inertial = observation_space["inertial_data"] 
+        # print(f"[DEBUG] FLIAExtractor -> Lidar shape: {lidar.shape}, Mask shape: {mask.shape}")
+        inertial = observation_space["inertial_data"]
         action = observation_space["last_action"]
 
-        self.lidar_feature_extractor, n_flatten_lidar = self._preprocess_lidar(lidar)
-        (self.inertial_feature_extractor,n_flatten_inertial,) = self._preprocess_inertial_data(inertial)
-        self.action_feature_extractor, nflatten_action = self._preprocess_action(action)
+        self.lidar_feature_extractor, n_flatten_lidar = self._preprocess_lidar(
+            lidar)
+        (self.inertial_feature_extractor, n_flatten_inertial,
+         ) = self._preprocess_inertial_data(inertial)
+        self.action_feature_extractor, nflatten_action = self._preprocess_action(
+            action)
 
         # Concatenate both feature extractors and pass through a linear layer
         concatenated_dim = n_flatten_lidar + n_flatten_inertial + nflatten_action
-        self.final_layer = nn.Sequential(nn.Linear(concatenated_dim, features_dim), nn.ReLU())
+        self.final_layer = nn.Sequential(
+            nn.Linear(concatenated_dim, features_dim), nn.ReLU())
 
     def _preprocess_action(self, action) -> Tuple[nn.Sequential, int]:
         # Feature extractor for the tuple observation (using Linear layers)
@@ -1049,10 +1064,10 @@ class FLIAExtractor(BaseFeaturesExtractor):
     def _preprocess_lidar(self, lidar_space, output_dim=512) -> Tuple[CNNDeepSetAttentionNet, int]:
         # Supondo que cada vizinho tem input_dim features (+ máscara no final)
 
-        _, C, H, W = lidar_space.shape  # stack_size (N neighbors), channels (distance, entity type, delta step), n_theta, n_phi
-        extractor = CNNDeepSetAttentionNet(input_shape=(C, H, W), hidden=output_dim, output_dim=output_dim, prob=0.5)
-     
-
+        # stack_size (N neighbors), channels (distance, entity type, delta step), n_theta, n_phi
+        _, C, H, W = lidar_space.shape
+        extractor = CNNDeepSetAttentionNet(input_shape=(
+            C, H, W), hidden=output_dim, output_dim=output_dim, prob=0.5)
 
         # o output já é (batch_size, output_dim)
         return extractor, output_dim
@@ -1083,7 +1098,8 @@ class FLIAExtractor(BaseFeaturesExtractor):
         inertial_data = observations["inertial_data"]
         action = observations["last_action"]
 
-        lidar_features = self.lidar_feature_extractor(lidar_observation, lidar_mask)
+        lidar_features = self.lidar_feature_extractor(
+            lidar_observation, lidar_mask)
         inertial_features = self.inertial_feature_extractor(
             inertial_data.flatten(start_dim=1)
         )
@@ -1094,4 +1110,3 @@ class FLIAExtractor(BaseFeaturesExtractor):
             dim=1,
         )
         return self.final_layer(concatenated_features)
-

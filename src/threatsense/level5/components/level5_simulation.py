@@ -1,5 +1,6 @@
 """The Aviary class, the core of how PyFlyt handles UAVs in the PyBullet simulation environment."""
 from __future__ import annotations
+from core.entities.quadcopters.quadcopter import Quadcopter
 
 
 import numpy as np
@@ -9,8 +10,6 @@ from pybullet_utils import bullet_client
 
 print("[ThreatSense] Importing Level 5 Aviary Simulation...")
 print("loading quadcopter module...")
-from core.entities.quadcopters.quadcopter import Quadcopter
-
 
 
 class L5AviarySimulation(bullet_client.BulletClient):
@@ -93,18 +92,21 @@ class L5AviarySimulation(bullet_client.BulletClient):
     def step(self):
         """Steps the environment, this automatically handles physics and control looprates, one step is equivalent to one control loop step."""
 
+        active_drones = self.active_drones
         for _ in range(self.updates_per_step):
-            for drone in self.active_drones.values():
+            for drone in active_drones.values():
                 # drone.update_state()
                 # update imu is a more meaningful name
                 # describing that Lidar or other sensors are not updated.
-                drone.update_imu()
+                drone.update_imu_without_publish()
                 drone.update_control()
                 drone.update_physics()
 
             self.stepSimulation()
-
             self.physics_steps += 1
+
+        for drone in active_drones.values():
+            drone.publish_imu()
 
     # ==========================================================================
     #   Drone List Interface

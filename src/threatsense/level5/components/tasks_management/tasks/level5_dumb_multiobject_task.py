@@ -85,6 +85,7 @@ class Level5DumbMultiObjectTask(Task):
         """
 
         self.NUM_PURSUERS = 6 + 1  # +1 for the agent
+        print(f"[INIT] NUM_PURSUERS: {self.NUM_PURSUERS}")
         self.INVADERS_PER_ROUND = 1
         self.INITIAL_NUMBER_OF_INVADERS = 5
         self.MAX_NUM_INVADERS = 30
@@ -260,7 +261,7 @@ class Level5DumbMultiObjectTask(Task):
         if agent.armed:
             self.loyalwingman_navigator.update(agent, self.offset_handler)
 
-        #pursuers = self.entities_manager.get_all_pursuers()
+        # pursuers = self.entities_manager.get_all_pursuers()
 
         for ally in allies:
             self.loyalwingman_navigator.update(ally, self.offset_handler)
@@ -599,10 +600,9 @@ class Level5DumbMultiObjectTask(Task):
         # This is an training environment, which means that it has to stop when the agent dies.
         agent = self.entities_manager.get_agent()
 
-        
-        #if not agent.armed:
+        # if not agent.armed:
         #    self._stage_status = TaskStatus.FAILURE
-            # print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
+        # print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
         #    return True
 
         # O QUE DEU MELHOR ANTES NÃO TINHA ISSO

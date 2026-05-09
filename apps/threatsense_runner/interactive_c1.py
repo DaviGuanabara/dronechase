@@ -1,3 +1,5 @@
+from threatsense.level5.level5_c1_fusion_environment import Level5C1FusionEnvironment as Level5Fusion
+from core.utils.keyboard_listener import KeyboardListener
 import sys
 import os
 import time
@@ -11,10 +13,11 @@ sys.path.append(parent_directory)
 grand_parent_directory = os.path.dirname(parent_directory)
 sys.path.append(grand_parent_directory)
 
+project_root = os.path.dirname(grand_parent_directory)
+src_path = os.path.join(project_root, "src")
+sys.path.append(src_path)
 
 
-from core.utils.keyboard_listener import KeyboardListener
-from threatsense.level5.level5_c1_fusion_environment import Level5C1FusionEnvironment as Level5Fusion
 print("Level 5 Fusion imported successfully.")
 
 print("Initializing Level 5 environment...")

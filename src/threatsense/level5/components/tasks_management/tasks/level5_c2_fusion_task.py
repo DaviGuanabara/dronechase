@@ -35,6 +35,7 @@ Os inimigos serão incrementados de 5 em 5 a cada round, para assim em pouco tem
 chegar a 30 inimigos, com uma alta probabilidade de oclusão.
 """
 
+
 class Level5C2FusionTask(Task):
     def __init__(
         self,
@@ -42,10 +43,13 @@ class Level5C2FusionTask(Task):
         entities_manager: EntitiesManager,
         dome_radius: float,
         # debug_on: bool = False,
-        building_position: np.ndarray = np.array([0, 0, 0.1]),
-       
+        building_position: np.ndarray | None = None,
     ):
         print("Level 5 - Task Init")
+        if building_position is None:
+            building_position = np.array([0, 0, 0.1], dtype=np.float32)
+        else:
+            building_position = np.asarray(building_position, dtype=np.float32)
 
         self.dome_radius = dome_radius
         self.entities_manager = entities_manager
@@ -72,7 +76,7 @@ class Level5C2FusionTask(Task):
         self.loyalwingman_navigator = LoyalWingmanBehaviorTree(
             building_position)
 
-        #print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
+        # print(f"[DEBUG] Level5_Task init - NUM_PURSUERS = {self.NUM_PURSUERS}")
 
     def _subscriber_simulation_step(self, message: Dict, message_context: MessageContext):
         self.current_step = message.get("step", 0)
@@ -88,32 +92,29 @@ class Level5C2FusionTask(Task):
         self.INITIAL_NUMBER_OF_INVADERS = 4
         self.MAX_NUM_INVADERS = 10
 
-
-        self.MAX_NUMBER_OF_ROUNDS = math.ceil(((self.MAX_NUM_INVADERS - self.INITIAL_NUMBER_OF_INVADERS) / self.INVADERS_PER_ROUND) + 1)
+        self.MAX_NUMBER_OF_ROUNDS = math.ceil(
+            ((self.MAX_NUM_INVADERS - self.INITIAL_NUMBER_OF_INVADERS) / self.INVADERS_PER_ROUND) + 1)
         self.INITIAL_ROUND = 1
 
         # Munitions must be calculated to account for the number of invaders
         total_invaders = (self.INITIAL_NUMBER_OF_INVADERS +
                           self.MAX_NUM_INVADERS) * self.MAX_NUMBER_OF_ROUNDS // 2
 
-
         self.MUNITION_PER_DEFENDER = total_invaders
 
-
-        #Standard, No need to change
+        # Standard, No need to change
         self.MAX_REWARD = 1000
         self.ENEMY_BORN_RADIUS = 6
         self.INVADER_EXPLOSION_RANGE = 0.2
         self.PURSUER_SHOOT_RANGE = 1
 
-        #Premature ending of the episode
-        #Pressure for killing invaders quickly
+        # Premature ending of the episode
+        # Pressure for killing invaders quickly
         self.STEP_INCREMENT = 100
         self.MAX_STEP = 300
 
-
-        #print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
-        #print(f"[INIT] MAX_NUM_INVADERS: {self.MAX_NUM_INVADERS}")
+        # print(f"[INIT] MAX_NUMBER_OF_ROUNDS: {self.MAX_NUMBER_OF_ROUNDS}")
+        # print(f"[INIT] MAX_NUM_INVADERS: {self.MAX_NUM_INVADERS}")
 
     def init_globals(self):
         self.current_step = 0
@@ -123,6 +124,9 @@ class Level5C2FusionTask(Task):
         self.agent_kills = 0
         self.allies_kills = 0
         self.deads = 0
+        self.pursuer_suicides = 0
+        self.agent_suicides = 0
+        self.invaders_reached_origin = 0
         self.is_building_destroyed = False
 
         self.last_closest_distance = self.dome_radius
@@ -173,14 +177,14 @@ class Level5C2FusionTask(Task):
         return self.current_round
 
     def setup_round(self, current_round):
-        
+
         self.entities_manager.disarm_all_invaders()
         invaders = self.entities_manager.get_all_invaders()
 
         n_invaders_to_activate = min((current_round - 1) * self.INVADERS_PER_ROUND +
                                      self.INITIAL_NUMBER_OF_INVADERS, self.MAX_NUM_INVADERS)
 
-        #print(f"[ROUND {current_round}] Activating {n_invaders_to_activate} invaders.")
+        # print(f"[ROUND {current_round}] Activating {n_invaders_to_activate} invaders.")
         positions = self.generate_positions(
             n_invaders_to_activate, self.ENEMY_BORN_RADIUS)
         for i in range(n_invaders_to_activate):
@@ -267,13 +271,13 @@ class Level5C2FusionTask(Task):
 
     def on_env_init(self):
         self._stage_status = TaskStatus.RUNNING
-        #print("level 5 fusion Task - on_env_init - Spawning invaders and pursuers")
+        # print("level 5 fusion Task - on_env_init - Spawning invaders and pursuers")
         self.spawn_invader_squad()
         self.spawn_pursuer_squad()
 
     def on_reset(self):
 
-        #print("level 5 task fusion task - on reset")
+        # print("level 5 task fusion task - on reset")
         self.on_episode_end()
         self.on_episode_start()
 
@@ -302,8 +306,8 @@ class Level5C2FusionTask(Task):
         Here lies the methods that should be executed BEFORE the STEP.
         It aims to set the environment to the simulation step execution.
         """
-        #print("on step start")
-        #print(f"[DEBUG] Level5FusionTask on_step_start - current_step: {self.current_step}")
+        # print("on step start")
+        # print(f"[DEBUG] Level5FusionTask on_step_start - current_step: {self.current_step}")
         self.drive_invaders()
         if not freeze_lw:
             self.drive_loyalwingmen()
@@ -330,6 +334,8 @@ class Level5C2FusionTask(Task):
         self.agent_kills += successful_rl_agent_shots
         self.allies_kills += successful_allies_shots
         self.deads += pursuers_exploded
+        self.pursuer_suicides += pursuer_suicided
+        self.agent_suicides += agent_suicided
 
         self.process_invaders_in_origin()
         reward = self.compute_reward(
@@ -394,14 +400,12 @@ class Level5C2FusionTask(Task):
 
         agent_id = self.entities_manager.agent_id
 
-        to_disarm: list = []
-        for pursuer_id in list(identified_invaders_nearby.keys()):
-            to_disarm.extend(
-                (pursuer_id, identified_invaders_nearby[pursuer_id][0]))
-            self.entities_manager.disarm_by_ids(to_disarm)
-            pursuer_munition = self.entities_manager.get_quadcopters(id=pursuer_id)[
-                0
-            ].gun.munition
+        for pursuer_id, invader_ids in identified_invaders_nearby.items():
+            invader_id = invader_ids[0]
+            pursuer = self.entities_manager.drone_registry[pursuer_id]
+            pursuer_munition = pursuer.gun.munition
+
+            self.entities_manager.disarm_by_ids([pursuer_id, invader_id])
 
             # If there is no munition, then the LW suicided to kill the kamikaze
             if pursuer_munition == 0 and pursuer_id == agent_id:
@@ -425,13 +429,10 @@ class Level5C2FusionTask(Task):
         successful_rl_agent_shots = 0
         successful_allies_shots = 0
 
-        for pursuer_id in list(identified_invaders_nearby.keys()):
-            if were_successful := self.entities_manager.shoot_by_ids(
-                pursuer_id, identified_invaders_nearby[pursuer_id][0]
-            ):
+        for pursuer_id, invader_ids in identified_invaders_nearby.items():
+            if self.entities_manager.shoot_by_ids(pursuer_id, invader_ids[0]):
                 if pursuer_id == agent.id:
                     successful_rl_agent_shots += 1
-
                 if pursuer_id != agent.id:
                     successful_allies_shots += 1
 
@@ -452,71 +453,82 @@ class Level5C2FusionTask(Task):
         pursuers_exploded=0,
         pursuer_suicided=0,
         agent_suicided=0,
-        allies_dead=0
+        allies_dead=0,
     ):
         """
-        Reward minimalista para engajamento do agente.
-        Penaliza também saídas do domo.
+        Reward for the RL-controlled agent.
+
+        The reward encourages:
+        - engagement when the agent is armed and the gun is available;
+        - evasive separation when the agent is reloading or unable to engage;
+        - high reward for successful agent kills;
+        - high penalties for agent death, leaving the combat dome, or hitting the ground.
         """
         agent = self.entities_manager.get_agent()
+
         munition = agent.gun_state[0]
         gun_available = agent.gun_state[2]
         position = agent.inertial_data["position"]
+        velocity = agent.inertial_data.get(
+            "velocity", np.zeros(3, dtype=np.float32))
+        velocity = np.asarray(velocity, dtype=np.float32)
+        speed = float(np.sqrt(np.dot(velocity, velocity)))
 
-        # Alvo mais próximo
-        target_id = self.offset_handler.identify_closest_invader(agent.id)
-        target_position = np.array([0.0, 0.0, 0.0])
-        if target_id > -1:
-            target = self.entities_manager.get_quadcopters(id=target_id)[0]
-            target_position = target.inertial_data["position"]
+        # Closest enemy target relative to the RL-controlled agent.
+        pursuer_index = self.offset_handler.current_offsets.pursuer_id_to_index.get(
+            agent.id)
+        if pursuer_index is not None and self.offset_handler.current_offsets.distances.shape[1] > 0:
+            distances_to_invaders = self.offset_handler.current_offsets.distances[pursuer_index]
+            distance = float(
+                distances_to_invaders[np.argmin(distances_to_invaders)])
+        else:
+            distance = self.last_closest_distance
 
-        distance = float(np.linalg.norm(position - target_position))
-        self.last_distance = distance if not hasattr(
-            self, 'last_distance') else self.last_distance
+        delta_distance = self.last_closest_distance - distance
 
         # ----------------------
-        # Parâmetros
-        AGENT_KILL_W = 1.0   # recompensa por kill
-        SELF_DEATH_W = 2.0   # penalidade por suicídio
-        OUTSIDE_DOME_W = 1.5  # penalidade por sair do domo
+        # Reward parameters
         # ----------------------
 
         reward = 0.0
 
-        # Recompensa se aproximar do alvo com velocidade
-        if distance < self.last_distance:
-            velocity = agent.inertial_data.get("velocity", np.zeros(3))
+        self.dome_radius
+
+        # Large penalty for leaving the combat dome, which is the main failure condition of the task.
+        if np.linalg.norm(position) > self.dome_radius:
+            reward -= self.MAX_REWARD
+
+        if position[2] < -5.99:
+            reward -= self.MAX_REWARD
+
+        reward += speed
+        if delta_distance > 0:
             reward += 10 * np.linalg.norm(velocity)
 
-        # Evento de kill
         if successful_rl_agent_shots > 0:
-            reward += AGENT_KILL_W * successful_rl_agent_shots * self.MAX_REWARD
+            reward += successful_rl_agent_shots * self.MAX_REWARD
 
-        # Penalidade por suicídio
+        # Agent death / suicide.
         if agent_suicided > 0:
-            reward -= SELF_DEATH_W * agent_suicided * self.MAX_REWARD
+            reward -= self.MAX_REWARD
 
-        # Penalidade por sair do domo
-        pursuers_outside = self.offset_handler.identify_pursuer_outside_dome()
-        if len(pursuers_outside) > 0 and agent.id in pursuers_outside:
-            reward -= OUTSIDE_DOME_W * self.MAX_REWARD
+        # Ground contact / invalid low altitude, aligned with termination condition.
+        if position[2] < -5.99:
+            reward -= self.MAX_REWARD
 
-        return float(np.clip(reward, -3.0 * self.MAX_REWARD, 3.0 * self.MAX_REWARD))
-
-
-   
+        return float(reward)
 
     def compute_termination(self) -> bool:
         """Calculate if the simulation is done."""
         # Step count exceeds maximum.
         if self.current_step > self.MAX_STEP:
             self._stage_status = TaskStatus.FAILURE
-            #print("[DEBUG] Level 5 fusion task (compute termination) - Max step exceeded")
+            # print("[DEBUG] Level 5 fusion task (compute termination) - Max step exceeded")
             return True
 
         if self.is_all_rounds_over():
-            #print(
-                #"[DEBUG] Level 5 fusion task (compute termination) - All rounds completed")
+            # print(
+            # "[DEBUG] Level 5 fusion task (compute termination) - All rounds completed")
             self._stage_status = TaskStatus.SUCCESS
             return True
 
@@ -533,7 +545,7 @@ class Level5C2FusionTask(Task):
         )
         if num_pursuers_outside_dome > 0:
             self._stage_status = TaskStatus.FAILURE
-            #print("[DEBUG] Level 5 fusion task (compute termination) - Pursuer outside dome")
+            # print("[DEBUG] Level 5 fusion task (compute termination) - Pursuer outside dome")
             return True
 
         num_invaders_outside_dome = len(
@@ -541,14 +553,14 @@ class Level5C2FusionTask(Task):
         )
         if num_invaders_outside_dome > 0:
             self._stage_status = TaskStatus.FAILURE
-            #print("[DEBUG] Level 5 fusion task (compute termination) - Invader outside dome")
+            # print("[DEBUG] Level 5 fusion task (compute termination) - Invader outside dome")
             return True
 
         # All pursuers destroyed.
         if len(self.entities_manager.get_armed_pursuers()) == 0:
             # print("All pursuers destroyed")
             self._stage_status = TaskStatus.FAILURE
-            #print("[DEBUG] Level 5 fusion task (compute termination) - All pursuers destroyed")
+            # print("[DEBUG] Level 5 fusion task (compute termination) - All pursuers destroyed")
             return True
 
         # This is an training environment, which means that it has to stop when the agent dies.
@@ -556,7 +568,7 @@ class Level5C2FusionTask(Task):
 
         if not agent.armed:
             self._stage_status = TaskStatus.FAILURE
-            #print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
+            # print("[DEBUG] Level 5 fusion task (compute termination) - Agent dead")
             return True
 
         # O QUE DEU MELHOR ANTES NÃO TINHA ISSO
@@ -564,12 +576,42 @@ class Level5C2FusionTask(Task):
         return position[2] < -5.99
 
     def compute_info(self):
+        total_kills = self.agent_kills + self.allies_kills
+        total_invaders = sum(
+            min(
+                (round_idx - 1) * self.INVADERS_PER_ROUND
+                + self.INITIAL_NUMBER_OF_INVADERS,
+                self.MAX_NUM_INVADERS,
+            )
+            for round_idx in range(self.INITIAL_ROUND, self.MAX_NUMBER_OF_ROUNDS + 1)
+        )
+
+        num_defenders = self.NUM_PURSUERS
+        num_allies = max(num_defenders - 1, 0)
+        denominator = max(total_invaders, 1)
+
         return {
+            "task_status": self.status.name,
+            "success": self.status == TaskStatus.SUCCESS,
+            "episode_duration_steps": self.current_step,
+            "current_wave": self.current_round,
+            "max_waves": self.MAX_NUMBER_OF_ROUNDS,
+            "num_defenders": num_defenders,
+            "num_allies": num_allies,
             "agent_kills": self.agent_kills,
             "allies_kills": self.allies_kills,
-            "deads": self.deads,
-            # "is_building_destroyed": self.is_building_destroyed,
-            "current_wave": self.current_round,
+            "total_kills": total_kills,
+            "total_invaders": total_invaders,
+            "kill_ratio": total_kills / denominator,
+            "agent_kill_ratio": self.agent_kills / denominator,
+            "allies_kill_ratio": self.allies_kills / denominator,
+            "kills_per_defender": total_kills / num_defenders if num_defenders > 0 else 0.0,
+            "kills_per_agent": self.agent_kills,
+            "kills_per_ally": self.allies_kills / num_allies if num_allies > 0 else 0.0,
+            "pursuers_exploded": self.deads,
+            "pursuer_suicides": self.pursuer_suicides,
+            "agent_suicides": self.agent_suicides,
+            "invaders_reached_origin": self.invaders_reached_origin,
         }
 
     # ===============================================================================
@@ -596,11 +638,12 @@ class Level5C2FusionTask(Task):
         )
 
         # Convert to Cartesian coordinates using broadcasting
-        xs = r * np.sin(phis) * np.cos(thetas)  # type: ignore
-        ys = r * np.sin(phis) * np.sin(thetas)
-        zs = r * np.cos(phis)
+        positions = np.empty((num_positions, 3), dtype=np.float32)
+        positions[:, 0] = r * np.sin(phis) * np.cos(thetas)
+        positions[:, 1] = r * np.sin(phis) * np.sin(thetas)
+        positions[:, 2] = r * np.cos(phis)
 
-        return np.column_stack((xs, ys, zs))
+        return positions
 
     def replace_invaders(self):
         # self.entities_manager.disarm_all()
@@ -641,7 +684,7 @@ class Level5C2FusionTask(Task):
         allies_pos = positions[1:]
         ally_names = [f"Ally{i}" for i in range(1, self.NUM_PURSUERS)]
 
-        #TODO: There is a problem here
+        # TODO: There is a problem here
         # this 'agent' is not the agent. This is misleading.
         # Spawn a agente com FusedLiDAR
         agent = self.entities_manager.spawn_pursuer(
@@ -657,23 +700,30 @@ class Level5C2FusionTask(Task):
         pursuers = agent + allies
 
         for pursuer in pursuers:
-            #print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
+            # print(f"pursuer {pursuer.id} spawned at {pursuer.inertial_data['position']}")
             pursuer.set_munition(self.MUNITION_PER_DEFENDER)
 
-        #print(f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
+        # print(f"[DEBUG] Total pursuers spawned: {len(pursuers)} of {self.NUM_PURSUERS}")
 
         self.entities_manager.set_agent()
 
     def get_invaders_positions(self):
         invaders = self.entities_manager.get_all_invaders()
-        return np.array([invader.inertial_data["position"] for invader in invaders])
+        return np.asarray(
+            [invader.inertial_data["position"] for invader in invaders],
+            dtype=np.float32,
+        )
 
     def get_pursuers_position(self):
         pursuers = self.entities_manager.get_all_pursuers()
-        return np.array([pursuer.inertial_data["position"] for pursuer in pursuers])
+        return np.asarray(
+            [pursuer.inertial_data["position"] for pursuer in pursuers],
+            dtype=np.float32,
+        )
 
     def process_invaders_in_origin(self):
         invaders_ids_to_remove = self.offset_handler.identify_invaders_in_origin()
+        self.invaders_reached_origin += len(invaders_ids_to_remove)
 
         self.entities_manager.disarm_by_ids(invaders_ids_to_remove)
 

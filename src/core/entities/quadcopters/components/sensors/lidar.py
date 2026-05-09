@@ -1,7 +1,7 @@
 import math
 import numpy as np
 from typing import Tuple, List, Dict
-import pybullet as p # type: ignore
+import pybullet as p  # type: ignore
 from gymnasium import spaces
 
 from core.dataclasses.message_context import MessageContext
@@ -60,18 +60,21 @@ class LIDAR(BaseLidar):
         self.PHI_FINAL_RADIAN = np.pi
         self.PHI_SIZE = self.PHI_FINAL_RADIAN - self.PHI_INITIAL_RADIAN
 
-        self.n_theta_points, self.n_phi_points = self._count_points(radius, resolution)
+        self.n_theta_points, self.n_phi_points = self._count_points(
+            radius, resolution)
         self.sphere: np.ndarray = self._gen_sphere(
             self.n_theta_points, self.n_phi_points, self.n_channels
         )
 
-        self.buffer_manager = LiDARBufferManager(current_step=0, max_buffer_size=1)
+        self.buffer_manager = LiDARBufferManager(
+            current_step=0, max_buffer_size=1)
         self.parent_inertia: Dict = {}
 
         self.DISTANCE_CHANNEL_IDX: int = LidarChannels.distance.value
         self.FLAG_CHANNEL_IDX: int = LidarChannels.flag.value
 
         self.threshold: float = 1
+        self._rotation_matrix = np.eye(3, dtype=np.float32)
 
     def _get_flag(self, entity_type: EntityType) -> float:
         return entity_type.value / len(EntityType)
@@ -130,7 +133,8 @@ class LIDAR(BaseLidar):
         theta = (theta_point - 0) / (
             n_theta_points - 0
         ) * theta_range + self.THETA_INITIAL_RADIAN
-        phi = (phi_point - 0) / (n_phi_points - 0) * phi_range + self.PHI_INITIAL_RADIAN
+        phi = (phi_point - 0) / (n_phi_points - 0) * \
+            phi_range + self.PHI_INITIAL_RADIAN
 
         return theta, phi
 
@@ -140,9 +144,7 @@ class LIDAR(BaseLidar):
         return np.ones((n_channels, n_theta_points, n_phi_points), dtype=np.float32)
 
     def reset(self):
-        self.sphere: np.ndarray = self._gen_sphere(
-            self.n_theta_points, self.n_phi_points
-        )
+        self.sphere.fill(1.0)
 
     # ============================================================================================================
     # Matrix Functions
@@ -154,7 +156,8 @@ class LIDAR(BaseLidar):
         spherical: np.ndarray,
         flag: float = 1,
     ):
-        norm_distance, theta_point, phi_point = self._normalize_spherical(spherical)
+        norm_distance, theta_point, phi_point = self._normalize_spherical(
+            spherical)
         current_norm_distance = self.sphere[self.DISTANCE_CHANNEL_IDX][theta_point][
             phi_point
         ]
@@ -172,28 +175,40 @@ class LIDAR(BaseLidar):
         #    f"self.sphere[self.DISTANCE_CHANNEL_IDX][theta_point][phi_point]:{self.sphere[self.DISTANCE_CHANNEL_IDX][theta_point][phi_point]}"
         # )
 
+    def _update_rotation_matrix(self) -> None:
+        quaternion = self.parent_inertia.get("quaternion")
+        if quaternion is None:
+            self._rotation_matrix[:] = np.eye(3, dtype=np.float32)
+            return
+        self._rotation_matrix[:] = np.asarray(
+            p.getMatrixFromQuaternion(quaternion),
+            dtype=np.float32,
+        ).reshape(3, 3).T
+
     def _rotate_position(self, position: np.ndarray) -> np.ndarray:
-        quaternion = self.parent_inertia["quaternion"]
-        rotation_matrix = (
-            np.array(p.getMatrixFromQuaternion(quaternion)).reshape(3, 3).T
-        )
-        return np.matmul(rotation_matrix, position)
+        return self._rotation_matrix @ position
 
     def _add_end_position(
         self,
         target_id,
         end_position: np.ndarray,
-        current_position: np.ndarray = np.array([0, 0, 0]),
+        current_position: np.ndarray | None = None,
         flag: float = 1,
     ):
+        if current_position is None:
+            current_position = np.zeros(3, dtype=np.float32)
+        else:
+            current_position = np.asarray(current_position, dtype=np.float32)
+
+        end_position = np.asarray(end_position, dtype=np.float32)
         relative_position: np.ndarray = end_position - current_position
         rotated_position = self._rotate_position(relative_position)
-        distance: np.float32 = np.linalg.norm(rotated_position)
+        distance_sq = float(np.dot(rotated_position, rotated_position))
+        radius_sq = self.radius * self.radius
 
-        if distance > 0 and distance < self.radius:
+        if 0.0 < distance_sq < radius_sq:
             spherical: np.ndarray = self.math.cartesian_to_spherical(
-                rotated_position
-            )
+                rotated_position)
             self._add_spherical(target_id, spherical, flag)
 
         # else:
@@ -206,7 +221,8 @@ class LIDAR(BaseLidar):
         if len(position) > 0:
             current_position = self.parent_inertia["position"]
             entity_flag = self._get_flag(entity_type)
-            self._add_end_position(target_id, position, current_position, entity_flag)
+            self._add_end_position(target_id, position,
+                                   current_position, entity_flag)
 
     def get_sphere(self) -> np.ndarray:
         return self.sphere
@@ -218,7 +234,7 @@ class LIDAR(BaseLidar):
     def buffer(self):
         raise ValueError("LIDAR, BUFFER PROPERTY NOT IMPLEMENTED")
         # BUFFER MANAGER CHANGED.
-        #return self.buffer_manager.buffer.copy()
+        # return self.buffer_manager.buffer.copy()
 
     # ============================================================================================================
     # Sensor Functions
@@ -244,7 +260,8 @@ class LIDAR(BaseLidar):
         topic: TopicsEnum = TopicsEnum.INERTIAL_DATA_BROADCAST
         # print("buffer_inertial_data", message, publisher_id)
         if "termination" in message:
-            self.buffer_manager.close_buffer(message_context.publisher_id, topic)
+            self.buffer_manager.close_buffer(
+                message_context.publisher_id, topic)
 
         elif message_context.publisher_id == self.parent_id:
             self.parent_inertia = message
@@ -264,21 +281,23 @@ class LIDAR(BaseLidar):
         buffer_data = self.buffer_manager.get_latest_messages_from_topic(
             topic=TopicsEnum.INERTIAL_DATA_BROADCAST, exclude_publisher_id=self.parent_id)
         self.reset()
+        if not self.parent_inertia:
+            return None
+        self._update_rotation_matrix()
 
         for target_id, message in buffer_data.items():
             publisher_type = message.get("publisher_type")
             if publisher_type is None:
                 continue  # ignore misformed or incomplete messages
-            
+
             position = message.get("position")
-            
+
             if position is not None:
                 self._add_end_position_for_entity(
                     position, publisher_type, target_id
                 )
 
         return None
-
 
     def read_data(self) -> Dict:
         return {"lidar": self.sphere}
@@ -290,7 +309,8 @@ class LIDAR(BaseLidar):
     def _normalize_angle(self, angle, initial_angle, final_angle, n_points) -> float:
         # linear interpolation
         return (
-            round((angle - initial_angle) / (final_angle - initial_angle) * n_points)
+            round((angle - initial_angle) /
+                  (final_angle - initial_angle) * n_points)
             % n_points
         )
 
@@ -372,6 +392,6 @@ class LIDAR(BaseLidar):
             theta_point, phi_point, n_theta_points, n_phi_points
         )
         cartesian_from_origin = self.math.spherical_to_cartesian(
-            np.array([distance * self.radius, theta, phi])
+            np.array([distance * self.radius, theta, phi], dtype=np.float32)
         )
         return cartesian_from_origin + current_position

@@ -29,21 +29,27 @@ class Quadcopter:
         self,
         quadx: QuadX,
         simulation: BulletClient,
-        lidar:Optional[BaseLidar] = None,
+        lidar: Optional[BaseLidar] = None,
         quadcopter_type: EntityType = EntityType.QUADCOPTER,
         quadcopter_name: Optional[str] = "",
         debug_on: bool = False,
         lidar_on: bool = False,
-        #lidar_radius: float = 5,
-        #lidar_resolution: int = 16,
+        # lidar_radius: float = 5,
+        # lidar_resolution: int = 16,
         shoot_range: float = 0.8,
-        formation_position: np.ndarray = np.array([0, 0, 0]),
-        
+        formation_position: np.ndarray | None = None,
     ):
-        
+
         self.step = 0
         self.quadx = quadx
+        if formation_position is None:
+            formation_position = np.zeros(3, dtype=np.float32)
+        else:
+            formation_position = np.asarray(
+                formation_position, dtype=np.float32)
         self.formation_position = formation_position
+        self.last_motion_command = np.zeros(4, dtype=np.float32)
+        self._zero_setpoint = np.zeros(4, dtype=np.float32)
 
         self.id: int = self.quadx.Id
         self.debug_on = debug_on
@@ -57,14 +63,14 @@ class Quadcopter:
         # print("init components")
         self.flight_state_manager: FlightStateManager = FlightStateManager()
         self.imu = InertialMeasurementUnit(quadx)
-        
+
         if lidar is None:
             self.lidar_on = False
         else:
             self.lidar = lidar
-        #lidar_class(
+        # lidar_class(
          #   self.id, self.client_id, radius=lidar_radius, resolution=lidar_resolution
-        #)
+        # )
         self.setup_gun(self.id, shoot_range)
 
         self.setup_message_hub()
@@ -72,9 +78,9 @@ class Quadcopter:
         # print("init components done")
 
         self.init_physical_properties()
-        self.update_color()
-
         self._is_agent = False
+        if self.debug_on:
+            self.update_color()
 
     def init_physical_properties(self):
         # print("getting dynamics info")
@@ -92,7 +98,7 @@ class Quadcopter:
     def update_color(self):
         Red = [1, 0, 0, 1]
         LightRed = [1, 0.5, 0.5, 1]
-        
+
         if self.is_agent:
             if self.armed:
                 # Green for armed agent
@@ -142,8 +148,8 @@ class Quadcopter:
     ):
         quadx = QuadX(
             simulation,
-            start_pos=position,
-            start_orn=np.zeros(3),
+            start_pos=np.asarray(position, dtype=np.float32),
+            start_orn=np.zeros(3, dtype=np.float32),
             physics_hz=physics_hz,
             np_random=np_random,
             # **drone_options,
@@ -152,13 +158,12 @@ class Quadcopter:
         quadx.set_mode(6)
 
         # print(f"Lidar Radius: {lidar_radius}")
-        lidar_resolution = 16
+        lidar_resolution = 8  # 16
 
-        #lidar_class = FusedLIDAR if use_fused_lidar else LIDAR
-        #lidar = lidar_class(quadx.Id, simulation._client, radius=lidar_radius,resolution=lidar_resolution,debug=debug_on)
-        lidar = FusedLIDAR(parent_id=quadx.Id, client_id=simulation._client, debug=debug_on, radius=lidar_radius, resolution=lidar_resolution)
-
-
+        # lidar_class = FusedLIDAR if use_fused_lidar else LIDAR
+        # lidar = lidar_class(quadx.Id, simulation._client, radius=lidar_radius,resolution=lidar_resolution,debug=debug_on)
+        lidar = FusedLIDAR(parent_id=quadx.Id, client_id=simulation._client,
+                           debug=debug_on, radius=lidar_radius, resolution=lidar_resolution)
 
         return Quadcopter(
             simulation=simulation,
@@ -167,7 +172,7 @@ class Quadcopter:
             quadcopter_type=EntityType.LOYALWINGMAN,
             debug_on=debug_on,
             lidar_on=lidar_on,
-            #lidar_radius=lidar_radius,
+            # lidar_radius=lidar_radius,
             formation_position=position,
             lidar=lidar
         )
@@ -183,11 +188,11 @@ class Quadcopter:
         lidar_on: bool = False,
         lidar_radius: float = 5,
     ):
-        #TODO: I WILL TREAT LIDAR ALWAYS OFF FOR LOITERING MUNITION
+        # TODO: I WILL TREAT LIDAR ALWAYS OFF FOR LOITERING MUNITION
         quadx = QuadX(
             simulation,
-            start_pos=position,
-            start_orn=np.zeros(3),
+            start_pos=np.asarray(position, dtype=np.float32),
+            start_orn=np.zeros(3, dtype=np.float32),
             physics_hz=physics_hz,
             np_random=np_random,
             # **drone_options,
@@ -251,14 +256,15 @@ class Quadcopter:
             subscriber=self._subscriber_broadcast_step
         )
 
-    def _publish(self, topic:TopicsEnum, message: Dict):
-        message_context = self.messageHub.create_message_context(publisher_id=self.id, step = self.step, entity_type=self.quadcopter_type)
-        self.messageHub.publish(topic=topic, message=message, message_context=message_context)
-
+    def _publish(self, topic: TopicsEnum, message: Dict):
+        message_context = self.messageHub.create_message_context(
+            publisher_id=self.id, step=self.step, entity_type=self.quadcopter_type)
+        self.messageHub.publish(
+            topic=topic, message=message, message_context=message_context)
 
     def _publish_lidar_data(self, message: Dict):
-        #print(f"Publishing lidar data for Quadcopter {self.id} on topic {TopicsEnum.LIDAR_DATA_BROADCAST.name}")
-        
+        # print(f"Publishing lidar data for Quadcopter {self.id} on topic {TopicsEnum.LIDAR_DATA_BROADCAST.name}")
+
         self._publish(topic=TopicsEnum.LIDAR_DATA_BROADCAST, message=message)
 
     def _publish_inertial_data(self):
@@ -270,8 +276,8 @@ class Quadcopter:
         inertial_data["dimensions"] = self.dimensions
 
         message = {**inertial_data, "publisher_type": self.quadcopter_type}
-        self._publish(topic=TopicsEnum.INERTIAL_DATA_BROADCAST, message=message)
-
+        self._publish(topic=TopicsEnum.INERTIAL_DATA_BROADCAST,
+                      message=message)
 
     def _subscriber_lidar_data(self, message: Dict, message_context: MessageContext):
         """
@@ -281,11 +287,16 @@ class Quadcopter:
         - message (Dict): The LiDAR data received.
         - publisher_id (int): The ID of the publisher of the data.
         """
-        # print(f"Received lidar data from {publisher_id}")
-        if self.lidar_on:
-            self.lidar.buffer_lidar_data(message, message_context)
+        if not self.lidar_on:
 
-    
+            return
+
+        if not getattr(self.lidar, "activate_fusion", False):
+
+            return
+
+        self.lidar.buffer_lidar_data(message, message_context)
+
     def _subscriber_inertial_data(self, message: Dict, message_context: MessageContext):
         """
         Handle incoming flight state data from the message hub.
@@ -302,7 +313,7 @@ class Quadcopter:
         step = message.get("step")
         if step is not None:
             self.step = step
-        #TODO: update_step in BaseLidar
+        # TODO: update_step in BaseLidar
         if self.lidar_on:
             self.lidar.buffer_step_broadcast(message, message_context)
 
@@ -312,20 +323,37 @@ class Quadcopter:
 
     def update_imu(self):
         # print(f"update_imu{self.id}")
-        self.update_state()
+        self.update_imu_without_publish()
+        self.publish_imu()
+
+    def update_imu_without_publish(self):
+        """
+        Update local IMU/flight-state data without publishing to MessageHub.
+        Use this inside high-frequency physics substeps so controllers still get
+        fresh state without broadcasting redundant inertial messages.
+        """
+        self.imu.update_data()
+        imu_data = self.imu.read_data()
+        self._update_flight_state(imu_data)
+
+    def publish_imu(self):
+        """
+        Publish the latest already-synced inertial data once per logical RL step.
+        """
+        self._publish_inertial_data()
 
     def update_lidar(self):
         # print("updating lidar")
-        #if self.quadcopter_type == EntityType.LOYALWINGMAN:
-            #print(f"[DEBUG] LoyalWingman {self.id}: Should update its LiDAR data. Lidar is {'on' if self.lidar_on else 'off'}")
+        # if self.quadcopter_type == EntityType.LOYALWINGMAN:
+        # print(f"[DEBUG] LoyalWingman {self.id}: Should update its LiDAR data. Lidar is {'on' if self.lidar_on else 'off'}")
         if self.lidar_on:
-   
+
             self.lidar.update_data()
             lidar_data = self.lidar.read_data()
-            #if not hasattr(self, "_printed_once_read"):
+            # if not hasattr(self, "_printed_once_read"):
             #    print(f"[DEBUG] quadcopter read_data keys: {list(lidar_data.keys())}")
             #    self._printed_once_read = True
-            
+
             self._update_flight_state(lidar_data)
             self._publish_lidar_data(lidar_data)
         # if self.debug_on:
@@ -380,20 +408,23 @@ class Quadcopter:
         """
         Convert the given command to a setpoint that can be used by the quadcopter's propulsion system.
         Parameters:
-        - command: The command to be converted. It is composed by:
-            - direction (3d) and magnitude (1d) of the desired velocity in the x, y, and z axes.
-        Returns:
-        - The converted setpoint.
+        - command: The command is composed by direction (3d) and magnitude (1d).
         """
-
+        command = np.asarray(command, dtype=np.float32)
         raw_direction = command[:3]
-        raw_direction_norm = np.linalg.norm(raw_direction)
-        direction = raw_direction / (
-            raw_direction_norm if raw_direction_norm > 0 else 1
-        )
-        magnutide = command[3]
-        vx, vy, vz = magnutide * direction
-        return np.array([vx, vy, 0, vz])
+        norm_sq = float(np.dot(raw_direction, raw_direction))
+
+        setpoint = np.empty(4, dtype=np.float32)
+        if norm_sq > 0.0:
+            scale = float(command[3]) / float(np.sqrt(norm_sq))
+            setpoint[0] = raw_direction[0] * scale
+            setpoint[1] = raw_direction[1] * scale
+            setpoint[2] = 0.0
+            setpoint[3] = raw_direction[2] * scale
+        else:
+            setpoint[:] = 0.0
+
+        return setpoint
 
     def drive(self, motion_command: np.ndarray, show_name_on: bool = False):
         """
@@ -403,20 +434,20 @@ class Quadcopter:
         """
 
         if show_name_on:
-            self.show_name()
+            # self.show_name()
+            pass
 
         # Remmeber that was chosen mdode 6:
         # - 6: vx, vy, vr, vz
         # - vp, vq, vr = angular velocities
         # - vx, vy, vz = ground linear velocities
-        self.last_motion_command = motion_command
-        self.quadx.setpoint = self.convert_command_to_setpoint(motion_command)
+        self.last_motion_command = np.asarray(motion_command, dtype=np.float32)
+        self.quadx.setpoint = self.convert_command_to_setpoint(
+            self.last_motion_command)
 
     @property
     def last_action(self):
-        if hasattr(self, "last_motion_command"):
-            return self.last_motion_command
-        return np.zeros(4)
+        return self.last_motion_command
 
     # =================================================================================================================
     # Simulation Manager
@@ -431,6 +462,8 @@ class Quadcopter:
             self.simulation.removeUserDebugItem(self.text_id)
 
     def replace(self, position: np.ndarray, attitude: np.ndarray):
+        position = np.asarray(position, dtype=np.float32)
+        attitude = np.asarray(attitude, dtype=np.float32)
         quaternion = self.simulation.getQuaternionFromEuler(attitude)
         self.simulation.resetBasePositionAndOrientation(
             self.id, position, quaternion)
@@ -443,6 +476,9 @@ class Quadcopter:
         return self._armed
 
     def arm(self):
+        if self._armed:
+            return
+
         self.simulation.changeDynamics(self.id, -1, mass=self.mass)
         self._setCollisionState(True)
         self._armed = True
@@ -450,7 +486,8 @@ class Quadcopter:
         # print(f"Q{self.id} - updating imu")
         self.update_imu()
         # print("updating its color")
-        self.update_color()
+        if self.debug_on:
+            self.update_color()
         # print("Armed")
 
         # self.reset()
@@ -459,6 +496,9 @@ class Quadcopter:
         self.gun.reset()
 
     def disarm(self):
+        if not self._armed:
+            return
+
         self.simulation.changeDynamics(self.id, -1, mass=0)
         self._setCollisionState(False)
 
@@ -468,13 +508,14 @@ class Quadcopter:
 
         self._armed = False
         self.messageHub.terminate(self.id)
-        self.update_color()
+        if self.debug_on:
+            self.update_color()
 
         # self.gun.reset()
         self.quadx.body.reset()
         self.quadx.motors.reset()
-        self.quadx.setpoint = np.zeros(4)
-        self.quadx.pwm = np.zeros(4)
+        self.quadx.setpoint = self._zero_setpoint.copy()
+        self.quadx.pwm = self._zero_setpoint.copy()
         self.quadx.disable_artificial_damping()
 
     def hit(self):
@@ -504,7 +545,8 @@ class Quadcopter:
         # Place the text slightly below the quadcopter
 
         text_position = np.array(
-            [quad_position[0], quad_position[1], quad_position[2] - 0.2]
+            [quad_position[0], quad_position[1], quad_position[2] - 0.2],
+            dtype=np.float32,
         )
         # Add the text, and store its ID for later reference
         textColorRGB = [0, 1, 0]
@@ -545,8 +587,23 @@ class Quadcopter:
             self.quadx.update_control()
 
     def update_physics(self):
-        if hasattr(self, "quadx") and self.quadx is not None:
-            self.quadx.update_physics()
+        if not hasattr(self, "quadx") or self.quadx is None:
+            return
+
+        # Inline the relevant parts of PyFlyt QuadX.update_physics(), but skip
+        # p.getContactPoints(). In this environment, physical contacts are not
+        # used for task logic: entities are disarmed/terminated before contact.
+        self.quadx.body.physics_update()
+        self.quadx.motors.physics_update(self.quadx.pwm)
+
+        drag_pqr = -self.quadx.drag_coef_pqr * \
+            (np.asarray(self.quadx.state[0], dtype=np.float32) ** 2)
+        self.simulation.applyExternalTorque(
+            self.id,
+            -1,
+            drag_pqr,
+            p.LINK_FRAME,
+        )
 
     def reset(self):
         if hasattr(self, "quadx") and self.quadx is not None:
@@ -556,14 +613,10 @@ class Quadcopter:
 
     def update_state(self):
         """
-        Update the inertial data of the quadcopter.
-        Only inertial data. Lidar is not considered here.
+        Update and publish the inertial data of the quadcopter.
+        Kept for compatibility with older call sites.
         """
-
-        self.imu.update_data()
-        imu_data = self.imu.read_data()
-        self._update_flight_state(imu_data)
-        self._publish_inertial_data()
+        self.update_imu()
 
     def update_last(self):
         self.quadx.update_last()
@@ -604,14 +657,18 @@ class Quadcopter:
         Marks this quadcopter as the agent.
         It updates internal components accordingly (e.g., LiDAR fusion).
         """
-        #print("drone set as agent")
-        #print(f"lidar is Fused ? {isinstance(self.lidar, FusedLIDAR)}")
+        # print("drone set as agent")
+        # print(f"lidar is Fused ? {isinstance(self.lidar, FusedLIDAR)}")
         if isinstance(self.lidar, FusedLIDAR):
-            #TODO: IN MAINTANANCE
+            # TODO: IN MAINTANANCE
             self.lidar.enable_fusion()
 
         self._is_agent = True
         self.quadcopter_name = f"Agent_{self.id}"
+        self.update_color()
+
+        if self.debug_on:
+            self.update_color()
 
     @property
     def is_agent(self) -> bool:

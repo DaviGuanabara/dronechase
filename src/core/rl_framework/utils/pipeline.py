@@ -55,7 +55,8 @@ class ReinforcementLearningPipeline:
         print("Valid environment kwargs:")
         pprint(valid_env_kwargs)
 
-        env_fns = [lambda: environment(**valid_env_kwargs) for _ in range(n_envs)]
+        env_fns = [lambda: environment(**valid_env_kwargs)
+                   for _ in range(n_envs)]
 
         vectorized_environment = SubprocVecEnv(env_fns)  # type: ignore
         return VecMonitor(vectorized_environment)
@@ -84,7 +85,8 @@ class ReinforcementLearningPipeline:
         print("Valid environment kwargs:")
         pprint(valid_env_kwargs)
 
-        env_fns = [lambda: environment(**valid_env_kwargs) for _ in range(n_envs)]
+        env_fns = [lambda: environment(**valid_env_kwargs)
+                   for _ in range(n_envs)]
 
         vectorized_environment = SubprocVecEnv(env_fns)  # type: ignore
         return VecMonitor(vectorized_environment)
@@ -113,7 +115,8 @@ class ReinforcementLearningPipeline:
         print("Valid environment kwargs:")
         pprint(valid_env_kwargs)
 
-        env_fns = [lambda: environment(**valid_env_kwargs) for _ in range(n_envs)]
+        env_fns = [lambda: environment(**valid_env_kwargs)
+                   for _ in range(n_envs)]
 
         vectorized_environment = DummyVecEnv(env_fns)  # type: ignore
         return VecMonitor(vectorized_environment)
@@ -127,7 +130,7 @@ class ReinforcementLearningPipeline:
         n_eval_episodes: int = 10,
         debug: bool = False,
         steps=1_000_000,
-        step_size_save=100_000
+        save_freq=100_000
     ):
         if callbacks_to_include is None:
             callbacks_to_include = [
@@ -135,8 +138,7 @@ class ReinforcementLearningPipeline:
                 CallbackType.CHECKPOINT,
                 CallbackType.PROGRESSBAR,
             ]
-        save_freq = max(step_size_save if steps >
-                        step_size_save else steps // 10, 1)
+        save_freq = max(save_freq if steps > save_freq else steps // 10, 1)
 
         return callbacklist(
             vectorized_environment,
@@ -199,9 +201,11 @@ class ReinforcementLearningPipeline:
         model_kwargs["policy"] = policy
 
         if model_type == "PPO":
-            model = ReinforcementLearningPipeline.create_ppo_model(**model_kwargs)
+            model = ReinforcementLearningPipeline.create_ppo_model(
+                **model_kwargs)
         elif model_type == "SAC":
-            model = ReinforcementLearningPipeline.create_sac_model(**model_kwargs)
+            model = ReinforcementLearningPipeline.create_sac_model(
+                **model_kwargs)
         else:
             raise ValueError(f"Invalid model type: {model_type}")
 
@@ -248,7 +252,7 @@ class ReinforcementLearningPipeline:
         device: str,
         tensorboard_log: str,
         debug=False,
-    )-> SAC:
+    ) -> SAC:
         """
         Creates a PPO model with the given parameters
         CustomActorCriticPolicy is used as the policy. It receives the CustomNetwork as MLP
@@ -333,7 +337,8 @@ class ReinforcementLearningPipeline:
 
         model_path = os.path.join(
             specific_model_dir,
-            f"t{trial_number}_{model.__class__.__name__}_r{avg_reward:.2f}.zip",  # _sd{reward_std_dev}.zip",
+            # _sd{reward_std_dev}.zip",
+            f"t{trial_number}_{model.__class__.__name__}_r{avg_reward:.2f}.zip",
         )
         model.save(model_path)
         if debug:
@@ -345,7 +350,8 @@ class ReinforcementLearningPipeline:
         full_path = os.path.join(specific_log_path, filename)
 
         df = pd.DataFrame(
-            {"Episode": range(1, len(episode_rewards) + 1), "Reward": episode_rewards}
+            {"Episode": range(1, len(episode_rewards) + 1),
+             "Reward": episode_rewards}
         )
 
         # Save the DataFrame to a CSV file
@@ -353,7 +359,8 @@ class ReinforcementLearningPipeline:
 
     @staticmethod
     def extract_folder_info(folder_name: str):
-        raise Exception("I changed the folder name pattern. This method is not working")
+        raise Exception(
+            "I changed the folder name pattern. This method is not working")
         pattern = r"(?P<model_name>\w+)-h\[(?P<hidden_layers>[\d, ]+)\]-f(?P<rl_frequency>\d+)-lr(?P<learning_rate>\d+\.\d+e?[-+]?\d*)-r(?P<avg_reward>\d+\.?\d*)-sd(?P<reward_std_dev>\d+\.?\d*)"
         match = re.match(pattern, folder_name)
         print(match)
@@ -363,10 +370,14 @@ class ReinforcementLearningPipeline:
             info["hidden_layers"] = list(
                 map(int, info["hidden_layers"].split(", "))
             )  # Convert to a list of integers
-            info["rl_frequency"] = int(info["rl_frequency"])  # Convert to an integer
-            info["learning_rate"] = float(info["learning_rate"])  # Convert to a float
-            info["avg_reward"] = float(info["avg_reward"])  # Convert to a float
-            info["reward_std_dev"] = float(info["reward_std_dev"])  # Convert to a float
+            info["rl_frequency"] = int(
+                info["rl_frequency"])  # Convert to an integer
+            info["learning_rate"] = float(
+                info["learning_rate"])  # Convert to a float
+            info["avg_reward"] = float(
+                info["avg_reward"])  # Convert to a float
+            info["reward_std_dev"] = float(
+                info["reward_std_dev"])  # Convert to a float
             return info
         else:
             return None
@@ -394,7 +405,8 @@ class ReinforcementLearningPipeline:
                 over the evaluation episodes.
 
         """
-        print(f"Evaluating the model's performance over {n_eval_episodes} episodes...")
+        print(
+            f"Evaluating the model's performance over {n_eval_episodes} episodes...")
 
         episode_rewards, _ = evaluate_policy(
             model,

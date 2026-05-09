@@ -4,13 +4,18 @@ import numpy as np
 from typing import Union, List, Dict, Any
 
 from enum import Enum, auto
-from copy import deepcopy
 
 
 class FlightStateDataType(Enum):
     INERTIAL = auto()
     LIDAR = auto()
     COMBINED = auto()
+
+
+INERTIAL_KEYS = ("position", "velocity", "attitude",
+                 "quaternion", "angular_rate")
+LIDAR_KEYS = ("lidar", "sphere", "features",
+              "stacked_spheres", "validity_mask")
 
 
 class FlightStateManager:
@@ -24,48 +29,49 @@ class FlightStateManager:
 
     def update_data(self, sensor_data: dict):
         """Update the flight state with new sensor data."""
-        self.data.update(sensor_data)
+        # Avoid dict resizing patterns by assigning explicitly
+        for k, v in sensor_data.items():
+            self.data[k] = v
 
-    def get_data(self, key: Union[str, List[str], None] = None) -> Dict[str, Any]:
-        """Retrieve specific sensor readings or all data."""
+    def get_data(self, key: Union[str, List[str], None] = None, copy: bool = False) -> Dict[str, Any]:
+        """Retrieve specific sensor readings or all data.
 
-        # If key is None or an empty string, return a deep copy of the entire data.
+        By default returns references (no copy) for performance.
+        Set copy=True to return shallow copies of arrays.
+        """
         if not key:
-            return deepcopy(self.data)
+            if copy:
+                return {k: (v.copy() if hasattr(v, "copy") else v) for k, v in self.data.items()}
+            return self.data
 
-        # If key is a string, check if it exists and then return a deep copy of the corresponding value.
         if isinstance(key, str):
-            return {
-                key: deepcopy(self.data.get(key))
-            }  # This will return the value for the key if it exists, or None if it doesn't
+            val = self.data.get(key)
+            if copy and val is not None and hasattr(val, "copy"):
+                val = val.copy()
+            return {key: val}
 
-        # If key is a list of strings, return a deep copy of the dictionary of corresponding values for existing keys.
-        return (
-            {k: deepcopy(self.data.get(k)) for k in key}
-            if isinstance(key, list)
-            else {}
-        )
+        if isinstance(key, list):
+            if copy:
+                result = {}
+                for k in key:
+                    val = self.data.get(k)
+                    if val is not None and hasattr(val, "copy"):
+                        val = val.copy()
+                    result[k] = val
+                return result
+            return {k: self.data.get(k) for k in key}
+
+        return {}
 
     def get_inertial_data(self) -> Dict[str, Any]:
         """Retrieve data related to the inertial measurement unit (IMU)."""
-        inertial_keys = [
-            "position",
-            "velocity",
-            "attitude",
-            "quaternion",
-            "angular_rate",
-        ]
-        return self.get_data(inertial_keys) or {key: None for key in inertial_keys}
+        data = {k: self.data.get(k) for k in INERTIAL_KEYS}
+        return data if any(v is not None for v in data.values()) else {key: None for key in INERTIAL_KEYS}
 
     def get_lidar_data(self) -> Dict[str, Any]:
         """Retrieve data related to the lidar."""
-        #TODO: ADICIONAR OS OUTROS DADOS DO LIDAR
-        #TODO: Essa classe tá uma bosta.
-        #raise ValueError("Update this method to match the new lidar data structure.")
-        
-        lidar_keys = ["lidar", "sphere", "features",
-                                  "stacked_spheres", "validity_mask"]
-        return self.get_data(lidar_keys) or {key: None for key in lidar_keys}
+        data = {k: self.data.get(k) for k in LIDAR_KEYS}
+        return data if any(v is not None for v in data.values()) else {key: None for key in LIDAR_KEYS}
 
     def get_data_by_type(
         self, flight_state_data_type: FlightStateDataType

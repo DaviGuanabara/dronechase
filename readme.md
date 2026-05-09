@@ -113,3 +113,57 @@ If you use this project, please cite:
   keywords={Laser radar;Weapons;Conferences;Education;Decision making;Deep reinforcement learning;Vehicle dynamics;Robots;Optimization;Drones;Machine Learning;Neural Network;Unmanned Aerial Vehicle;Air Defense System},
   doi={10.1109/SBR/WRE63066.2024.10837749}}
 ```
+
+
+
+Requirements:
+conda create -n dronechase python=3.11
+conda activate dronechase
+
+conda install -c conda-forge pybullet
+
+pip install pyflyt==0.11.1 --no-deps
+
+poetry install
+
+
+conda install -c pytorch pytorch torchvision
+conda install -c fvcore -c iopath -c conda-forge fvcore iopath
+
+
+
+conda install -c fvcore -c iopath -c conda-forge fvcore iopath ninja
+
+
+## MACOS MX Installation
+
+
+### Install PyTorch3D MACOS (requires PyTorch 2.4.1)
+
+conda activate dronechase310
+
+python -c "import torch; print(torch.__version__)"
+confirme que é 2.4.1. Depois:
+
+export MACOSX_DEPLOYMENT_TARGET=10.14
+export CC=clang
+export CXX=clang++
+export CXXFLAGS="-Wno-invalid-specialization"
+export CFLAGS="-Wno-invalid-specialization"
+export MAX_JOBS=1
+
+pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable" \
+  --no-build-isolation \
+  --no-cache-dir \
+  -v
+
+### Install Pybullet 3.2.4 (for PyFlyt)
+conda activate dronechase310
+conda install -c conda-forge pybullet
+
+### Install Pyflyt 0.11.1 (for simulation)
+pip install pyflyt==0.11.1 --no-deps
+
+### Install project dependencies with Poetry
+poetry lock
+poetry install

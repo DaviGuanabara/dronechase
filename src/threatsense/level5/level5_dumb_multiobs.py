@@ -7,6 +7,7 @@ from threatsense.level5.components.tasks_management.tasks_dispatcher import Task
 from threatsense.level5.level5_envrionment import Level5Environment
 from gymnasium import Env, spaces
 
+
 class Level5DumbMultiObs(Level5Environment):
     def __init__(self, GUI=True, rl_frequency=15):
         super().__init__(GUI=GUI, rl_frequency=rl_frequency)
@@ -25,15 +26,13 @@ class Level5DumbMultiObs(Level5Environment):
         agent = self.entities_manager.get_agent()
         allies = self.entities_manager.get_allies()
         return [agent] + allies
-    
+
     def _observation_space(self):
         return spaces.Box(
             low=0, high=1, shape=(1,), dtype=np.float32)
 
-
     def compute_observation(self):
         return np.zeros(1).astype(np.float32)
-    
 
     def _compute_general_vision(self) -> np.ndarray:
         """Return the observation of the simulation.
@@ -44,9 +43,9 @@ class Level5DumbMultiObs(Level5Environment):
             pursuer.update_lidar()
 
         # rl_agent.update_lidar()
-        
+
         observations = []
-        #pursuers = self._get_pursuers_agent_first()
+        # pursuers = self._get_pursuers_agent_first()
         pursuers = self.entities_manager.get_armed_pursuers()
 
         for pursuer in pursuers:
@@ -57,15 +56,14 @@ class Level5DumbMultiObs(Level5Environment):
 
             gun_state = pursuer.gun_state
 
-            
-
-            inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0).astype(np.float32)
+            inertial_gun_concat = np.concatenate(
+                (inertial_data, gun_state), axis=0).astype(np.float32)
 
             # assert lidar is not None, "Lidar data is None"
             assert stacked_spheres is not None, "Stacked spheres data is None"
             assert validity_mask is not None, "Validity mask data is None"
 
-            observations.append( {
+            observations.append({
                 "stacked_spheres": stacked_spheres.astype(np.float32),
                 # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
                 "lidar": np.zeros((2, 13, 26), dtype=np.float32),
@@ -77,11 +75,10 @@ class Level5DumbMultiObs(Level5Environment):
             })
 
         return np.array(observations)
-    
+
     def _action_space(self):
         return spaces.Box(
             low=-1, high=1, shape=(4,), dtype=np.float32)
-
 
     def _compute_student_vision(self):
         observations: np.ndarray = self._compute_general_vision()
@@ -97,23 +94,25 @@ class Level5DumbMultiObs(Level5Environment):
         return new_set
 
     def step(self, action):
-        
 
         self.task_progression.on_step_start()
 
         self.advance_step()
         observation = self.compute_observation()
         reward, terminated = self.task_progression.on_step_middle()
-         
+
         info = self.compute_info()
 
         self.task_progression.on_step_end()
 
         truncated = False
-        
+
         return observation, reward, terminated, truncated, info
 
-    def compute_info(self):
+    def compute_info(self, observation=None):
+        """
+        For each pursuer, compute the observation and action info to be returned in the info dict.
+        """
 
         pursuers = self.entities_manager.get_armed_pursuers()
 
@@ -123,7 +122,6 @@ class Level5DumbMultiObs(Level5Environment):
         observations = []
         actions = []
 
-
         for pursuer in pursuers:
 
             stacked_spheres = pursuer.lidar_data.get("stacked_spheres", None)
@@ -131,8 +129,9 @@ class Level5DumbMultiObs(Level5Environment):
 
             inertial_data: np.ndarray = self.process_inertial_state(pursuer)
             gun_state = pursuer.gun_state
-            inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0)
-            
+            inertial_gun_concat = np.concatenate(
+                (inertial_data, gun_state), axis=0)
+
             if stacked_spheres is None:
                 raise ValueError("Stacked spheres data is None")
             if validity_mask is None:

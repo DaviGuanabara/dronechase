@@ -9,6 +9,8 @@ from threatsense.level5.components.tasks_management.tasks.level5_occlusion_demo_
 from threatsense.level5.components.tasks_management.tasks.level5_fusion_task import Level5FusionTask
 from threatsense.level5.components.tasks_management.tasks.level5_c1_fusion_task import Level5C1FusionTask
 from threatsense.level5.components.tasks_management.tasks.level5_2bt_evaluation_task import Level52BTEvaluationTask
+
+
 class TasksDispatcher:
 
     @staticmethod
@@ -16,38 +18,37 @@ class TasksDispatcher:
         print("[TasksDispatcher] Dispatching Level 5 tasks")
 
         return [Level5_Task(quadcopter_manager, dome_radius)]
-    
+
     @staticmethod
     def level5_occlusion_demo(dome_radius, quadcopter_manager) -> "list[Task]":
         print("[TasksDispatcher] Dispatching Level 5 occlusion demo tasks")
 
         return [Level5_Occlusion_Demo_Task(quadcopter_manager, dome_radius)]
-    
 
     @staticmethod
     def level5_fusion(dome_radius, quadcopter_manager) -> "list[Task]":
         print("[TasksDispatcher] Dispatching Level 5 fusion tasks")
 
         return [Level5FusionTask(quadcopter_manager, dome_radius)]
-    
+
     @staticmethod
     def level5_c1_fusion(dome_radius, quadcopter_manager) -> "list[Task]":
         print("[TasksDispatcher] Dispatching Level 5 fusion tasks")
 
         return [Level5C1FusionTask(quadcopter_manager, dome_radius)]
-    
-    #@staticmethod
-    #def level5_c2_fusion(dome_radius, quadcopter_manager) -> "list[Task]":
-    #    print("[TasksDispatcher] Dispatching Level 5 fusion tasks")
 
-    #    return [Level5C2FusionTask(quadcopter_manager, dome_radius)]
+    @staticmethod
+    def level5_c2_fusion(dome_radius, quadcopter_manager) -> "list[Task]":
+        print("[TasksDispatcher] Dispatching Level 5 c2 fusion task")
+
+        return [Level5C2FusionTask(quadcopter_manager, dome_radius)]
 
     @staticmethod
     def level5_dumb_multi_object(dome_radius, quadcopter_manager) -> "list[Task]":
         print("[TasksDispatcher] Dispatching Level 5 dumb multi-object tasks")
 
         return [Level5DumbMultiObjectTask(quadcopter_manager, dome_radius)]
-    
+
     @staticmethod
     def level5_2bt_evaluation(dome_radius, quadcopter_manager) -> "list[Task]":
         print("[TasksDispatcher] Dispatching Level 5 evaluation 2BT tasks")

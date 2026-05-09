@@ -11,6 +11,10 @@ class Offsets:
     directions: np.ndarray
     pursuer_ids: list
     invader_ids: list
+    pursuer_ids_array: np.ndarray
+    invader_ids_array: np.ndarray
+    pursuer_id_to_index: dict[int, int]
+    invader_id_to_index: dict[int, int]
     pursuer_positions: np.ndarray  # Array of pursuer positions (pursuers x 3)
     invader_positions: np.ndarray  # Array of invader positions (invaders x 3)
     pursuer_velocities: np.ndarray
@@ -74,21 +78,33 @@ class OffsetHandler:
         invaders: "list[Quadcopter]" = self.entities_manager.get_armed_invaders()
         pursuers: "list[Quadcopter]" = self.entities_manager.get_armed_pursuers()
 
-        invaders_positions, invader_ids = self.compute_positions_and_ids(invaders)
-        pursuers_positions, pursuer_ids = self.compute_positions_and_ids(pursuers)
-        pursuers_velocities = np.array(
-            [pursuer.inertial_data["velocity"] for pursuer in pursuers]
+        invaders_positions, invader_ids = self.compute_positions_and_ids(
+            invaders)
+        pursuers_positions, pursuer_ids = self.compute_positions_and_ids(
+            pursuers)
+        pursuers_velocities = np.asarray(
+            [p.inertial_data["velocity"] for p in pursuers],
+            dtype=np.float32,
         )  # Shape (n_pursuers, 3)
 
         distances, directions = self.compute_distances_and_directions(
             pursuers_positions, invaders_positions
         )
 
+        pursuer_ids_array = np.asarray(pursuer_ids, dtype=np.int32)
+        invader_ids_array = np.asarray(invader_ids, dtype=np.int32)
+        pursuer_id_to_index = {id_: i for i, id_ in enumerate(pursuer_ids)}
+        invader_id_to_index = {id_: i for i, id_ in enumerate(invader_ids)}
+
         return Offsets(
             distances,
             directions,
             pursuer_ids,
             invader_ids,
+            pursuer_ids_array,
+            invader_ids_array,
+            pursuer_id_to_index,
+            invader_id_to_index,
             pursuers_positions,
             invaders_positions,
             pursuers_velocities,
@@ -98,13 +114,11 @@ class OffsetHandler:
         self, current_offsets: Offsets, last_offsets: Offsets
     ) -> Offsets:
         # Filter last_offsets to keep only invaders present in current_offsets
-        common_invader_ids = set(last_offsets.invader_ids) & set(
-            current_offsets.invader_ids
-        )
-        indices_to_keep = [
-            last_offsets.invader_ids.index(invader_id)
-            for invader_id in common_invader_ids
-        ]
+        id_to_index = {id_: i for i, id_ in enumerate(
+            last_offsets.invader_ids)}
+
+        indices_to_keep = [id_to_index[i]
+                           for i in current_offsets.invader_ids if i in id_to_index]
 
         distances = last_offsets.distances[:, indices_to_keep]
         directions = last_offsets.directions[:, indices_to_keep]
@@ -120,19 +134,29 @@ class OffsetHandler:
             last_offsets.pursuer_velocities
         )  # seems to be a 2D array with one row, so keep as is
 
+        pursuer_ids_array = np.asarray(pursuer_ids, dtype=np.int32)
+        invader_ids_array = np.asarray(invader_ids, dtype=np.int32)
+        pursuer_id_to_index = {id_: i for i, id_ in enumerate(pursuer_ids)}
+        invader_id_to_index = {id_: i for i, id_ in enumerate(invader_ids)}
+
         return Offsets(
             distances,
             directions,
             pursuer_ids,
             invader_ids,
+            pursuer_ids_array,
+            invader_ids_array,
+            pursuer_id_to_index,
+            invader_id_to_index,
             pursuer_positions,
             invader_positions,
             pursuer_velocities,
         )
 
     def compute_positions_and_ids(self, quadcopters):
-        positions = np.array(
-            [quadcopter.inertial_data["position"] for quadcopter in quadcopters]
+        positions = np.asarray(
+            [q.inertial_data["position"] for q in quadcopters],
+            dtype=np.float32,
         )
         ids = [quadcopter.id for quadcopter in quadcopters]
         return positions, ids
@@ -149,15 +173,20 @@ class OffsetHandler:
 
     def compute_distances_and_directions(self, pursuers_positions, invaders_positions):
         relative_positions = (
-            pursuers_positions[:, np.newaxis, :] - invaders_positions[np.newaxis, :, :]
+            pursuers_positions[:, np.newaxis, :] -
+            invaders_positions[np.newaxis, :, :]
         )
 
-        distances = np.linalg.norm(relative_positions, axis=-1)
+        out = np.empty_like(relative_positions)
+        out.fill(0.0)
+
+        distances = np.sqrt(
+            np.einsum("ijk,ijk->ij", relative_positions, relative_positions))
         mask = distances[:, :, np.newaxis] != 0
         directions = np.divide(
             relative_positions,
             distances[:, :, np.newaxis],
-            out=np.zeros_like(relative_positions),
+            out=out,
             where=mask,
         )
 
@@ -165,10 +194,9 @@ class OffsetHandler:
 
     # TODO: Refactor this method
     def identify_closest_ally(self, pursuer_id) -> int:
-        try:
-            pursuer_index = self.current_offsets.pursuer_ids.index(pursuer_id)
-        except ValueError:
-            # Pursuer ID not found
+        pursuer_index = self.current_offsets.pursuer_id_to_index.get(
+            pursuer_id)
+        if pursuer_index is None:
             return -1
 
         allies_positions = self.current_offsets.pursuer_positions
@@ -200,7 +228,8 @@ class OffsetHandler:
     @property
     def current_closest_agent_to_invader_distance(self) -> int:
         return np.sum(
-            self.compute_closest_rl_agent_distance(self.current_offsets.distances)
+            self.compute_closest_rl_agent_distance(
+                self.current_offsets.distances)
         )
 
     @property
@@ -225,7 +254,8 @@ class OffsetHandler:
     #        if is_captured_by_any_pursuer[idx]
     #    ]
 
-    def identify_closest_pursuer(self, invader_id: int) -> int:  # Dict[int, float]:
+    # Dict[int, float]:
+    def identify_closest_pursuer(self, invader_id: int) -> int:
         """
         Identify the closest pursuer to a given invader and return their ID and distance.
 
@@ -235,10 +265,9 @@ class OffsetHandler:
         Returns:
             Dict[int, float]: A dictionary with the closest pursuer's ID as the key and the distance as the value.
         """
-        try:
-            invader_index = self.current_offsets.invader_ids.index(invader_id)
-        except ValueError:
-            # Invader ID not found in the current offsets
+        invader_index = self.current_offsets.invader_id_to_index.get(
+            invader_id)
+        if invader_index is None:
             return -1  # {}
 
         # Extract distances to this invader from all pursuers
@@ -263,10 +292,9 @@ class OffsetHandler:
         Returns:
             int: The ID of the closest invader.
         """
-        try:
-            pursuer_index = self.current_offsets.pursuer_ids.index(pursuer_id)
-        except ValueError:
-            # Pursuer ID not found in the current offsets
+        pursuer_index = self.current_offsets.pursuer_id_to_index.get(
+            pursuer_id)
+        if pursuer_index is None:
             return -1
 
         # Extract distances to this pursuer from all invaders
@@ -295,14 +323,16 @@ class OffsetHandler:
             invaders_indices = np.where(range_mask[pursuer_index])[0]
 
             # Calcula as distâncias para invasores dentro do alcance
-            distances = self.current_offsets.distances[pursuer_index, invaders_indices]
+            distances = self.current_offsets.distances[pursuer_index,
+                                                       invaders_indices]
 
             # Associa invasores com suas respectivas distâncias e ordena
             invaders_distances = zip(invaders_indices, distances)
             sorted_invaders = sorted(invaders_distances, key=lambda x: x[1])
 
             # Salva os IDs dos invasores ordenados pela distância no dicionário
-            ids = [self.current_offsets.invader_ids[i] for i, _ in sorted_invaders]
+            ids = [self.current_offsets.invader_ids[i]
+                   for i, _ in sorted_invaders]
             if len(ids) > 0:
                 invaders_in_range[pursuer_id] = ids
 
@@ -323,7 +353,8 @@ class OffsetHandler:
             invaders_indices = np.where(range_mask[pursuer_index])[0]
 
             # Calculate the distances to invaders within range
-            distances = self.current_offsets.distances[pursuer_index, invaders_indices]
+            distances = self.current_offsets.distances[pursuer_index,
+                                                       invaders_indices]
 
             # Associate invaders with their respective distances and sort
             invaders_distances = zip(invaders_indices, distances)
@@ -339,12 +370,16 @@ class OffsetHandler:
         return closest_invader_per_pursuer
 
     def identify_invaders_in_origin(self, threshold_range=0.2) -> list:
-        invaders_in_origin_bool_array = (
-            np.linalg.norm(self.current_offsets.invader_positions, axis=1)
-            < threshold_range
+        threshold_sq = threshold_range * threshold_range
+        distances_sq = np.einsum(
+            "ij,ij->i",
+            self.current_offsets.invader_positions,
+            self.current_offsets.invader_positions,
         )
+        invaders_in_origin_bool_array = distances_sq < threshold_sq
         return list(
-            np.array(self.current_offsets.invader_ids)[invaders_in_origin_bool_array]
+            self.current_offsets.invader_ids_array[
+                invaders_in_origin_bool_array]
         )
 
     def identify_closest_invader_to_origin(self) -> int:
@@ -360,8 +395,10 @@ class OffsetHandler:
             return -1
 
         # Extract distances to this pursuer from all invaders
-        distances_to_origin = np.linalg.norm(
-            self.current_offsets.invader_positions, axis=1
+        distances_to_origin = np.einsum(
+            "ij,ij->i",
+            self.current_offsets.invader_positions,
+            self.current_offsets.invader_positions,
         )
 
         # Find the minimum distance and corresponding invader index
@@ -373,21 +410,29 @@ class OffsetHandler:
         return closest_invader_id
 
     def identify_pursuer_outside_dome(self) -> list:
-        pursuers_outside_dome_bool_array = (
-            np.linalg.norm(self.current_offsets.pursuer_positions, axis=1)
-            > self.dome_radius
+        dome_radius_sq = self.dome_radius * self.dome_radius
+        distances_sq = np.einsum(
+            "ij,ij->i",
+            self.current_offsets.pursuer_positions,
+            self.current_offsets.pursuer_positions,
         )
+        pursuers_outside_dome_bool_array = distances_sq > dome_radius_sq
         return list(
-            np.array(self.current_offsets.pursuer_ids)[pursuers_outside_dome_bool_array]
+            self.current_offsets.pursuer_ids_array[
+                pursuers_outside_dome_bool_array]
         )
 
     def identify_invader_outside_dome(self) -> list:
-        invaders_outside_dome_bool_array = (
-            np.linalg.norm(self.current_offsets.invader_positions, axis=1)
-            > self.dome_radius
+        dome_radius_sq = self.dome_radius * self.dome_radius
+        distances_sq = np.einsum(
+            "ij,ij->i",
+            self.current_offsets.invader_positions,
+            self.current_offsets.invader_positions,
         )
+        invaders_outside_dome_bool_array = distances_sq > dome_radius_sq
         return list(
-            np.array(self.current_offsets.invader_ids)[invaders_outside_dome_bool_array]
+            self.current_offsets.invader_ids_array[
+                invaders_outside_dome_bool_array]
         )
 
     def identify_pursuer_touched_ground(self) -> list:
@@ -399,7 +444,8 @@ class OffsetHandler:
             self.current_offsets.pursuer_positions[:, 2] < 0.01
         )
         return list(
-            np.array(self.current_offsets.pursuer_ids)[pursuer_at_ground_bool_array]
+            self.current_offsets.pursuer_ids_array[
+                pursuer_at_ground_bool_array]
         )
 
     def identify_invader_touched_ground(self) -> list:
@@ -411,7 +457,8 @@ class OffsetHandler:
             self.current_offsets.invader_positions[:, 2] < 0.01
         )
         return list(
-            np.array(self.current_offsets.invader_ids)[invader_at_ground_bool_array]
+            self.current_offsets.invader_ids_array[
+                invader_at_ground_bool_array]
         )
 
     # ===========================================================================
@@ -421,13 +468,13 @@ class OffsetHandler:
     def get_invader_position(self, id: int) -> np.ndarray:
         """Get the position of the entity with the specified ID."""
 
-        invader_index = self.current_offsets.invader_ids.index(id)
+        invader_index = self.current_offsets.invader_id_to_index[id]
         return self.current_offsets.invader_positions[invader_index]
 
     def get_pursuer_position(self, id: int) -> np.ndarray:
         """Get the position of the entity with the specified ID."""
 
-        pursuer_index = self.current_offsets.pursuer_ids.index(id)
+        pursuer_index = self.current_offsets.pursuer_id_to_index[id]
         return self.current_offsets.pursuer_positions[pursuer_index]
 
     def get_purusers_positions(self) -> np.ndarray:

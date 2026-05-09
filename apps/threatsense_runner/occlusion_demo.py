@@ -1,24 +1,23 @@
+from threatsense.level5.level5_occlusion_demo import Level5OcclusionDemo as OcclusionDemo
 from core.utils.keyboard_listener import KeyboardListener
 import sys
 import os
 import time
 
 
-#current_directory = os.path.dirname(os.path.abspath(__file__))
-#sys.path.append(current_directory)
+# current_directory = os.path.dirname(os.path.abspath(__file__))
+# sys.path.append(current_directory)
 
-#parent_directory = os.path.dirname(current_directory)
-#sys.path.append(parent_directory)
+# parent_directory = os.path.dirname(current_directory)
+# sys.path.append(parent_directory)
 
-#grand_parent_directory = os.path.dirname(parent_directory)
-#sys.path.append(grand_parent_directory)
-
+# grand_parent_directory = os.path.dirname(parent_directory)
+# sys.path.append(grand_parent_directory)
 
 
 print("Importing Level 5 Occlusion Demo...")
-from threatsense.level5.level5_occlusion_demo import Level5OcclusionDemo as OcclusionDemo
 print("Level 5 Occlusion Demo imported successfully.")
-
+print("get keymap not works in MacOS")
 env = OcclusionDemo(GUI=True, rl_frequency=15)
 
 

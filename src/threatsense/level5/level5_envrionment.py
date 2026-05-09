@@ -48,7 +48,6 @@ class Level5Environment(Env):
         dome_radius: float = 20,
         rl_frequency: int = 15,
         GUI: bool = False,
-        Teacher_Student: bool = True,
     ):
         """Initialize the environment."""
         print("Init Level 5 Environment Init ThreatSense level 5 environment")
@@ -64,13 +63,10 @@ class Level5Environment(Env):
         self.setup_static_entities()
 
         # self.step_counter = 0
-        #self.task_progression.on_env_init()
-        #self.task_progression.on_episode_start()
+        # self.task_progression.on_env_init()
+        # self.task_progression.on_episode_start()
         self.action_space = self._action_space()
         self.observation_space = self._observation_space()
-        if Teacher_Student:
-            self.teacher_observation_space = self._teacher_observation_space()
-            self.student_observation_space = self._student_observation_space()
 
     def _teacher_observation_space(self):
         observation_shape = self.observation_shape()
@@ -82,20 +78,19 @@ class Level5Environment(Env):
                     shape=(2, 13, 26),   # 🔑 mantém shape antigo
                     dtype=np.float32,
                 ),
-
                 "inertial_data": spaces.Box(
-                    -np.ones((observation_shape["inertial_data"],)),
-                    np.ones((observation_shape["inertial_data"],)),
+                    -np.ones((observation_shape["inertial_data"],), dtype=np.float32),
+                    np.ones(
+                        (observation_shape["inertial_data"],), dtype=np.float32),
                     shape=(observation_shape["inertial_data"],),
                     dtype=np.float32,
                 ),
                 "last_action": spaces.Box(
-                    np.array([-1, -1, -1, 0]),
-                    np.array([1, 1, 1, 1]),
+                    np.array([-1, -1, -1, 0], dtype=np.float32),
+                    np.array([1, 1, 1, 1], dtype=np.float32),
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
-
             }
         )
 
@@ -111,21 +106,20 @@ class Level5Environment(Env):
                 ),
                 "validity_mask": spaces.MultiBinary(observation_shape["validity_mask"]),
                 "inertial_data": spaces.Box(
-                    -np.ones((observation_shape["inertial_data"],)),
-                    np.ones((observation_shape["inertial_data"],)),
+                    -np.ones((observation_shape["inertial_data"],), dtype=np.float32),
+                    np.ones(
+                        (observation_shape["inertial_data"],), dtype=np.float32),
                     shape=(observation_shape["inertial_data"],),
                     dtype=np.float32,
                 ),
                 "last_action": spaces.Box(
-                    np.array([-1, -1, -1, 0]),
-                    np.array([1, 1, 1, 1]),
+                    np.array([-1, -1, -1, 0], dtype=np.float32),
+                    np.array([1, 1, 1, 1], dtype=np.float32),
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
-
             }
         )
-
 
     def setup_static_entities(self):
         entities_manager = self.entities_manager
@@ -151,7 +145,8 @@ class Level5Environment(Env):
         self.max_step_calls = 20 * rl_frequency
 
     def init_globals(self):
-        self.last_action = np.zeros(4)
+        self.last_action = np.zeros(4, dtype=np.float32)
+
         self.step_counter = 0
 
     def init_task_progression(self):
@@ -176,10 +171,10 @@ class Level5Environment(Env):
         print("task progression init - Level 5 Environment")
 
         self.init_task_progression()
-        #self.task_progression = TaskProgression(
+        # self.task_progression = TaskProgression(
         #    TasksDispatcher.level5_tasks(
         #        self.dome_radius, self.entities_manager)
-        #)
+        # )
 
         self.setup_messange_hub()
 
@@ -194,7 +189,7 @@ class Level5Environment(Env):
     def manage_debug_text(self, text: str, debug_text_id=None):
         return self.simulation.addUserDebugText(
             text,
-            position=np.zeros(3),
+            position=np.zeros(3, dtype=np.float32),
             replaceItemUniqueId=debug_text_id,
             textColorRGB=[1, 1, 1],
             textSize=1,
@@ -205,12 +200,12 @@ class Level5Environment(Env):
     def close(self):
         """Terminates the environment."""
         pass
-        #self.simulation.close()
+        # self.simulation.close()
 
     def reset_step_counter(self):
         self.step_counter = 0
         self._broadcast_step()
-        
+
     def advance_step_counter(self):
         self.step_counter += 1
         self._broadcast_step()
@@ -232,20 +227,24 @@ class Level5Environment(Env):
         self.reset_step_counter()
 
         observation = self.compute_observation()
-        #if not hasattr(self, "_printed_once_obs"):
+        # if not hasattr(self, "_printed_once_obs"):
         #    print(
         #        f"[DEBUG] LEVEL 5 ENVIRONMENT RESET compute_observation returning: {list(observation.keys())}")
         #    self._printed_once_obs = True
 
-        info = self.compute_info()
+        info = self.compute_info(observation)
 
-        #print("Level 5 Environment - reset done")
+        # print("Level 5 Environment - reset done")
         return observation, info
 
     # TODO: I have to work on this method.
     # the action should go only to the RL Agent. And the other entities should be controlled by the task class.
-    def step(self, rl_action: np.ndarray = np.array([0, 0, 0, 0])):
-        self.last_action: np.ndarray = rl_action
+    def step(self, rl_action: np.ndarray | None = None):
+        if rl_action is None:
+            rl_action = np.zeros(4, dtype=np.float32)
+        else:
+            rl_action = np.asarray(rl_action, dtype=np.float32)
+        self.last_action = rl_action
 
         # TODO: Basically, i have to create a function in entities_manager that returns the RL Agent.
         # And it needs to be separeted from other entities. Maybe, i just need to create a quadcopter_type called RL Agent.
@@ -261,25 +260,26 @@ class Level5Environment(Env):
         self.advance_step()
 
         reward, terminated = self.task_progression.on_step_middle()
-        #info = self.task_progression.compute_info()
-        
+        # info = self.task_progression.compute_info()
 
         observation = self.compute_observation()
-        info = self.compute_info()
+        info = self.compute_info(observation)
         truncated = False
 
         self.task_progression.on_step_end()
 
-        #print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
+        # print(f"[DEBUG] Level5Environment step -> observation: {list(observation.keys())}")
         return observation, reward, terminated, truncated, info
 
     def _broadcast_step(self):
         ENVIRONMENT_ID = 0
 
-        message = {"step": self.step_counter, "timestep": 1 / self.rl_frequency}
-        message_context = self.message_hub.create_message_context(publisher_id=ENVIRONMENT_ID, step=self.step_counter)
-        self.message_hub.publish(topic=TopicsEnum.AGENT_STEP_BROADCAST, message=message, message_context=message_context)
-   
+        message = {"step": self.step_counter,
+                   "timestep": 1 / self.rl_frequency}
+        message_context = self.message_hub.create_message_context(
+            publisher_id=ENVIRONMENT_ID, step=self.step_counter)
+        self.message_hub.publish(topic=TopicsEnum.AGENT_STEP_BROADCAST,
+                                 message=message, message_context=message_context)
 
     def advance_step(self):
         for _ in range(self.aggregate_sim_steps):
@@ -287,24 +287,24 @@ class Level5Environment(Env):
 
         self.advance_step_counter()
 
-        #self.message_hub.publish(
+        # self.message_hub.publish(
         #    TopicsEnum.AGENT_STEP_BROADCAST,
         #    {"step": self.step_counter, "timestep": 1 / self.rl_frequency},
         #    0, #publisher_id
-        #)
+        # )
 
     # ====================================================================================================
     # observation, truncated, info
     # ====================================================================================================
 
-    def compute_info(self):
-        return {"student_observation": self._compute_observation_student(), "teacher_observation": self._compute_observation_teacher()}
+    def compute_info(self, observation: Dict | None = None):
+        return {}
 
     def _action_space(self):
         # direction and intensity fo velocity
         return spaces.Box(
-            low=np.array([-1, -1, -1, 0]),
-            high=np.array([1, 1, 1, 1]),
+            low=np.array([-1, -1, -1, 0], dtype=np.float32),
+            high=np.array([1, 1, 1, 1], dtype=np.float32),
             shape=(4,),
             dtype=np.float32,
         )
@@ -317,49 +317,56 @@ class Level5Environment(Env):
         for pursuer in self.entities_manager.get_all_pursuers():
             pursuer.update_lidar()
 
-        #rl_agent.update_lidar()
+        # rl_agent.update_lidar()
         rl_agent = self.entities_manager.get_agent()
         inertial_data: np.ndarray = self.process_inertial_state(rl_agent)
- 
+
         stacked_spheres = rl_agent.lidar_data.get("stacked_spheres", None)
         validity_mask = rl_agent.lidar_data.get("validity_mask", None)
 
-        gun_state = rl_agent.gun_state
+        gun_state = np.asarray(rl_agent.gun_state, dtype=np.float32)
 
-        inertial_gun_concat = np.concatenate((inertial_data, gun_state), axis=0).astype(
-            np.float32
+        inertial_gun_concat = np.empty(
+            inertial_data.size + gun_state.size,
+            dtype=np.float32,
         )
+        inertial_gun_concat[:inertial_data.size] = inertial_data
+        inertial_gun_concat[inertial_data.size:] = gun_state
 
-        #assert lidar is not None, "Lidar data is None"
+        # assert lidar is not None, "Lidar data is None"
         assert stacked_spheres is not None, "Stacked spheres data is None"
         assert validity_mask is not None, "Validity mask data is None"
 
-        #print(f"[DEBUG] Level5Environment compute_observation -> mask {validity_mask}")
-        #print(f"[DEBUG] Level5Environment compute_observation -> stacked_spheres shape: {stacked_spheres.shape}, validity_mask shape: {validity_mask.shape}")
-
-
+        # print(f"[DEBUG] Level5Environment compute_observation -> mask {validity_mask}")
+        # print(f"[DEBUG] Level5Environment compute_observation -> stacked_spheres shape: {stacked_spheres.shape}, validity_mask shape: {validity_mask.shape}")
 
         return {
-            "stacked_spheres": stacked_spheres.astype(np.float32),
+            "stacked_spheres": stacked_spheres.astype(np.float32, copy=False),
             # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
             "lidar": np.zeros((2, 13, 26), dtype=np.float32),
             "validity_mask": validity_mask.astype(bool),
             # inertial_data.astype(np.float32),
             "inertial_data": inertial_gun_concat,
-            "last_action": self.last_action.astype(np.float32),
+            "last_action": self.last_action.astype(np.float32, copy=False),
             # "gun": gun_state.astype(np.float32),
         }
-    
-    def _compute_observation_teacher(self):
-        observation = self.compute_observation()
-        del observation["stacked_spheres"]
-        del observation["validity_mask"]
-        return observation
-    
-    def _compute_observation_student(self):
-        observation = self.compute_observation()
-        del observation["lidar"]
-        return observation
+
+    def _compute_observation_teacher(self, observation: Dict | None = None):
+        if observation is None:
+            observation = self.compute_observation()
+
+        teacher_observation = dict(observation)
+        teacher_observation.pop("stacked_spheres", None)
+        teacher_observation.pop("validity_mask", None)
+        return teacher_observation
+
+    def _compute_observation_student(self, observation: Dict | None = None):
+        if observation is None:
+            observation = self.compute_observation()
+
+        student_observation = dict(observation)
+        student_observation.pop("lidar", None)
+        return student_observation
 
     def _observation_space(self):
         """Returns the observation space of the environment.
@@ -390,26 +397,26 @@ class Level5Environment(Env):
                     shape=observation_shape["stacked_spheres"],
                     dtype=np.float32,
                 ),
-                #"lidar": spaces.Box(
+                # "lidar": spaces.Box(
                 #    0,
                 #    1,
                 #    shape=(2, 13, 26),   # 🔑 mantém shape antigo
                 #    dtype=np.float32,
-                #),  # spaces.Box(0, 1, shape=observation_shape["lidar"], dtype=np.float32), #só por compatibilidade mesmo
+                # ),  # spaces.Box(0, 1, shape=observation_shape["lidar"], dtype=np.float32), #só por compatibilidade mesmo
                 "validity_mask": spaces.MultiBinary(observation_shape["validity_mask"]),
                 "inertial_data": spaces.Box(
-                    -np.ones((observation_shape["inertial_data"],)),
-                    np.ones((observation_shape["inertial_data"],)),
+                    -np.ones((observation_shape["inertial_data"],), dtype=np.float32),
+                    np.ones(
+                        (observation_shape["inertial_data"],), dtype=np.float32),
                     shape=(observation_shape["inertial_data"],),
                     dtype=np.float32,
                 ),
                 "last_action": spaces.Box(
-                    np.array([-1, -1, -1, 0]),
-                    np.array([1, 1, 1, 1]),
+                    np.array([-1, -1, -1, 0], dtype=np.float32),
+                    np.array([1, 1, 1, 1], dtype=np.float32),
                     shape=(observation_shape["last_action"],),
                     dtype=np.float32,
                 ),
-
             }
         )
 
@@ -430,20 +437,20 @@ class Level5Environment(Env):
         lidar = rl_agent.lidar
         if not isinstance(lidar, FusedLIDAR):
             assert False, "Lidar should be FusedLIDAR"
-        #if isinstance(lidar, FusedLIDAR):
+        # if isinstance(lidar, FusedLIDAR):
         return {
             "stacked_spheres": lidar.get_stacked_lidar_shape(),
-            #"lidar": lidar.get_data_shape(), #só por compatibilidade mesmo
+            # "lidar": lidar.get_data_shape(), #só por compatibilidade mesmo
             "validity_mask": lidar.get_validity_mask_shape(),
             "inertial_data": inertial_data,
             "last_action": last_action_shape,
         }
 
-        #return {
+        # return {
         #    "lidar": rl_agent.lidar_shape,
         #    "inertial_data": inertial_data,
         #    "last_action": last_action_shape,
-        #}
+        # }
 
     ## Helpers #####################################################################
 
@@ -458,15 +465,24 @@ class Level5Environment(Env):
         return self.convert_dict_to_array(normalized_inertial_data)
 
     def convert_dict_to_array(self, dictionary: Dict) -> np.ndarray:
-        array = np.array([])
-        for key in dictionary:
-            value: np.ndarray = (
-                dictionary[key] if dictionary[key] is not None else np.array([
-                ])
-            )
-            array = np.concatenate((array, value))
+        size = 0
+        values = []
+        for value in dictionary.values():
+            if value is None:
+                continue
+            value = np.asarray(value, dtype=np.float32).ravel()
+            values.append(value)
+            size += value.size
 
-        return array
+        out = np.empty(size, dtype=np.float32)
+
+        cursor = 0
+        for value in values:
+            n = value.size
+            out[cursor:cursor + n] = value
+            cursor += n
+
+        return out
 
     ################################################################################
 

@@ -12,7 +12,6 @@ from typing import Dict, Optional, Tuple
 import torch
 
 
-
 from torch import nn, optim
 from torch.utils.data import DataLoader
 
@@ -43,48 +42,70 @@ class SupervisedImitationTrainer:
         self.io_data = IOData(folder_path)
         self.loader = self.io_data.get_loader(batch_size=1024, shuffle=True)
 
-    def kill_high_correlation(
-        self, obs, target, device, rng: np.random.Generator, alpha: float = 0.1
-    ):
+    def get_training_device(self) -> torch.device:
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        return torch.device("cpu")
+
+    def kill_high_correlation(self, obs, target, device, rng, alpha=0.1):
         """
-        Quebra correlação forte do last_action:
-        - 20% completamente aleatório
-        - 40% mantém a ação real
-        - 40% adiciona ruído gaussiano (moderado)
-        
-        Args:
-            obs (dict): observações do batch
-            target (Tensor): ações alvo
-            device (torch.device): dispositivo
-            rng (np.random.Generator): gerador aleatório para reprodutibilidade
-            alpha (float): fração do range da ação usada como desvio padrão (default=0.1)
+        Makes last_action deliberately unreliable during supervised imitation.
+
+        Distribution per sample:
+        - 60% fully random action
+        - 20% zero action
+        - 20% noisy version of the real last_action
+        - 0% clean keep
+
+        This keeps the last_action input present during training, but prevents the
+        model from solving the task by simply copying the previous action.
         """
         batch_size = target.shape[0]
-        p = rng.random()
+        last_action = obs["last_action"].to(device=device, dtype=torch.float32)
 
-        if p < 0.2:
-            # 20% completamente aleatório
-            obs["last_action"] = torch.empty(
-                (batch_size, 4), dtype=torch.float32, device=device
-            ).uniform_(-1, 1)
+        probs = rng.random(batch_size)
+        mask_rand = probs < 0.6
+        mask_zero = (probs >= 0.6) & (probs < 0.8)
+        mask_noise = probs >= 0.8
 
-        elif p < 0.6:
-            # 40% mantém a ação real
-            obs["last_action"] = obs["last_action"].to(device)
+        new_last_action = torch.zeros_like(last_action)
 
-        else:
-            # 40% adiciona ruído gaussiano
-            std = alpha * 2.0  # range = 2 se ações normalizadas [-1,1]
-            noise = torch.from_numpy(rng.normal(
-                0, std, size=(batch_size, 4))).float().to(device)
-            obs["last_action"] = obs["last_action"].to(device) + noise
-            obs["last_action"] = torch.clamp(
-                obs["last_action"], -1, 1)  # garante range válido
+        if mask_rand.any():
+            rand_count = int(mask_rand.sum())
+            rand = torch.empty(
+                (rand_count, last_action.shape[1]), device=device)
+            rand[:, :3].uniform_(-1.0, 1.0)
+            rand[:, 3:] = torch.rand((rand_count, 1), device=device)
+            new_last_action[mask_rand] = rand
 
+        if mask_zero.any():
+            new_last_action[mask_zero] = 0.0
+
+        if mask_noise.any():
+            noise_count = int(mask_noise.sum())
+            noise = torch.zeros(
+                (noise_count, last_action.shape[1]), device=device)
+            noise[:, :3] = torch.as_tensor(
+                rng.normal(0.0, alpha, size=(noise_count, 3)),
+                device=device,
+                dtype=torch.float32,
+            )
+            noise[:, 3:] = torch.as_tensor(
+                rng.normal(0.0, alpha * 0.5, size=(noise_count, 1)),
+                device=device,
+                dtype=torch.float32,
+            )
+            new_last_action[mask_noise] = last_action[mask_noise] + noise
+
+        new_last_action[:, :3] = torch.clamp(new_last_action[:, :3], -1.0, 1.0)
+        new_last_action[:, 3:] = torch.clamp(new_last_action[:, 3:], 0.0, 1.0)
+
+        obs["last_action"] = new_last_action
         return obs
 
-
-    def loss_mae_direction(self, command_pred, u_label, w_dir=0.8, w_mag=0.2, w_raw_direction = 0.1, eps=1e-8):
+    def loss_mae_direction(self, command_pred, u_label, w_dir=0.8, w_mag=0.2, w_raw_direction=0.1, eps=1e-8):
         """
         command_pred: (B,4) -> [dx, dy, dz, m_pred]
         u_label     : (B,4) -> [dx, dy, dz, m_true]
@@ -111,17 +132,13 @@ class SupervisedImitationTrainer:
         return w_dir*L_dir + w_mag*L_mag + w_raw_direction*L_raw_direction
 
 
-
-
-
 # ==== Training Loop (supervised imitation) ====
 
-    
     def train_loop(self, env, policy_kwargs, sample_size, n_runs, output_dir, epochs=1, batch_size=256, lr=1e-3, rng=None):
- 
-        
+
         rng = np.random.default_rng(42) if rng is None else rng
- 
+        device = self.get_training_device()
+        print(f"[SL] Training device: {device}")
 
         for run in range(n_runs):
             run_name = f"train_sl_{run+1}"
@@ -133,7 +150,9 @@ class SupervisedImitationTrainer:
                 policy_kwargs=policy_kwargs,
                 verbose=1,
                 learning_rate=3e-4,
+                device=device,
             )
+            print(f"[SL] Model policy device: {model.policy.device}")
 
             loader = self.io_data.get_loader_limit(
                 limit_size=sample_size, batch_size=batch_size, shuffle=True, rng=rng
@@ -146,13 +165,13 @@ class SupervisedImitationTrainer:
             print("====================================\n")
 
     def train_student_ppo_wrapped(
-        self, model: PPO, loader, run_name, epochs=1,
-        batch_size=256, lr=1e-3, output_dir="/train_sl", limit_size=500_000, rng=None):
-        
+            self, model: PPO, loader, run_name, epochs=1,
+            batch_size=256, lr=1e-3, output_dir="/train_sl", limit_size=500_000, rng=None):
 
         # === Dataset ===
 
-        model, logs = self._train_ppo(model, loader, epochs=epochs, lr=lr, rng=rng, run_name=run_name)
+        model, logs = self._train_ppo(
+            model, loader, epochs=epochs, lr=lr, rng=rng, run_name=run_name)
 
         # === Salva modelo e logs ===
         run_output_dir = os.path.join(output_dir, run_name)
@@ -168,12 +187,13 @@ class SupervisedImitationTrainer:
 
         return model
 
-
     def _train_ppo(
-        self, model: PPO, train_loader, rng, epochs=1, lr=1e-3, run_name="train_sl"):
-        
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        optimizer = optim.Adam(model.policy.parameters(), lr=lr)
+            self, model: PPO, train_loader, rng, epochs=1, lr=1e-3, run_name="train_sl"):
+
+        device = model.policy.device
+        print(f"[SL] _train_ppo using model.policy.device: {device}")
+        optimizer = optim.Adam(model.policy.parameters(),  # type: ignore
+                               lr=lr)  # type: ignore
         global_batch = 0
 
         logs = []
@@ -191,8 +211,12 @@ class SupervisedImitationTrainer:
                 # Corrige last_action com ruído/dropout
                 obs = self.kill_high_correlation(obs, target, device, rng=rng)
 
-                obs = {k: v.to(model.policy.device) for k, v in obs.items()}
-                target = target.to(model.policy.device)
+                obs = {
+                    k: v.to(device=device, dtype=torch.float32) if k != "validity_mask" else v.to(
+                        device=device)
+                    for k, v in obs.items()
+                }
+                target = target.to(device=device, dtype=torch.float32)
 
                 features = model.policy.extract_features(obs)
                 latent_pi, _ = model.policy.mlp_extractor(features)
@@ -203,13 +227,15 @@ class SupervisedImitationTrainer:
 
                 optimizer.zero_grad()
                 loss.backward()
-                nn_utils.clip_grad_norm_(model.policy.parameters(), max_norm=1.0)
+                nn_utils.clip_grad_norm_(
+                    model.policy.parameters(), max_norm=1.0)
                 optimizer.step()
 
                 total_loss += loss.item() * target.size(0)
 
                 loss_window.append(loss.item())  # adiciona no fim
-                avg_loss_50 = sum(loss_window) / len(loss_window)  # média da janela
+                avg_loss_50 = sum(loss_window) / \
+                    len(loss_window)  # média da janela
 
                 # Tempo decorrido e ETA (por batch)
                 elapsed = time.time() - start_time
@@ -220,12 +246,11 @@ class SupervisedImitationTrainer:
                     f"Run: {run_name} | "
                     f"Epoch [{epoch+1}/{epochs}] "
                     f"Batch [{i}/{num_batches}] "
-                    #f"Loss: {loss.item():.4f} "
+                    f"Loss: {loss.item():.4f} "
                     f"Avg Loss (50): {avg_loss_50:.4f} "
                     f"Elapsed: {elapsed:.1f}s "
                     f"ETA: {eta/60:.1f}min"
                 )
-
 
                 print(msg.ljust(120), end="\r", flush=True)
 

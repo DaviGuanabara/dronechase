@@ -11,10 +11,11 @@ def normalize_inertial_data(
     # (2 * pi rad / rev)
     angular_max_speed = 2 * np.pi
 
-    position = inertial_data.get("position", np.zeros(3))
-    velocity = inertial_data.get("velocity", np.zeros(3))
-    attitude = inertial_data.get("attitude", np.zeros(3))
-    angular_rate = inertial_data.get("angular_rate", np.zeros(3))
+    position = inertial_data.get("position", np.zeros(3).astype(np.float32))
+    velocity = inertial_data.get("velocity", np.zeros(3).astype(np.float32))
+    attitude = inertial_data.get("attitude", np.zeros(3).astype(np.float32))
+    angular_rate = inertial_data.get(
+        "angular_rate", np.zeros(3).astype(np.float32))
 
     norm_position = normalize_position(position, dome_radius)
     norm_attitude = normalize_attitude(attitude)

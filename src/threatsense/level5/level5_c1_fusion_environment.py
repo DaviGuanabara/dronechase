@@ -4,6 +4,7 @@ from threatsense.level5.components.tasks_management.tasks_dispatcher import Task
 from threatsense.level5.level5_envrionment import Level5Environment
 from gymnasium import Env, spaces
 
+
 class Level5C1FusionEnvironment(Level5Environment):
     def __init__(self, GUI=True, rl_frequency=15):
         super().__init__(GUI=GUI, rl_frequency=rl_frequency)
@@ -39,23 +40,22 @@ class Level5C1FusionEnvironment(Level5Environment):
         gun_state = agent.gun_state
 
         inertial_gun_concat = np.concatenate(
-                (inertial_data, gun_state), axis=0).astype(np.float32)
+            (inertial_data, gun_state), axis=0).astype(np.float32)
 
-            # assert lidar is not None, "Lidar data is None"
+        # assert lidar is not None, "Lidar data is None"
         assert stacked_spheres is not None, "Stacked spheres data is None"
         assert validity_mask is not None, "Validity mask data is None"
 
         return {
-                "stacked_spheres": stacked_spheres.astype(np.float32),
-                # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
- 
-                "validity_mask": validity_mask.astype(bool),
-                # inertial_data.astype(np.float32),
-                "inertial_data": inertial_gun_concat,
-                "last_action": agent.last_action.astype(np.float32),
-                # "gun": gun_state.astype(np.float32),
-            }
+            "stacked_spheres": stacked_spheres.astype(np.float32),
+            # dummy compatível, #lidar.astype(np.float32),  # só por compatibilidade mesmo
 
+            "validity_mask": validity_mask.astype(bool),
+            # inertial_data.astype(np.float32),
+            "inertial_data": inertial_gun_concat,
+            "last_action": agent.last_action.astype(np.float32),
+            # "gun": gun_state.astype(np.float32),
+        }
 
     def _observation_space(self):
         """Returns the observation space of the environment.
@@ -103,6 +103,8 @@ class Level5C1FusionEnvironment(Level5Environment):
 
             }
         )
-    
-    def compute_info(self):
+
+    def compute_info(self, observation=None):
+        if hasattr(self, "task_progression"):
+            return self.task_progression.compute_info()
         return {}

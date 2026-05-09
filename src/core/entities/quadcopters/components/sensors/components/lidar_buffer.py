@@ -1,4 +1,4 @@
-import random
+import numpy as np
 from typing import Dict, List, Optional
 
 from core.dataclasses.message_context import MessageContext
@@ -18,6 +18,7 @@ class SnapshotBuffer:
     This class enforces encapsulation: snapshots can only be accessed or updated via
     its API, ensuring consistent handling of temporal normalization and entity mapping.
     """
+
     def __init__(self, max_size: int):
         """
         Initialize a new SnapshotBuffer.
@@ -30,6 +31,7 @@ class SnapshotBuffer:
         self._buffer: Dict[int, List[Optional[PerceptionSnapshot]]] = {}
         self.publisher_entity_map: Dict[int, EntityType] = {}
         self.current_step = 0
+        self._publisher_ids: List[int] = []
 
     def add_publisher(self, publisher_id: int, entity_type: EntityType):
         """
@@ -46,10 +48,11 @@ class SnapshotBuffer:
         if publisher_id not in self._buffer:
             self._buffer[publisher_id] = [None] * self.max_size
             self.publisher_entity_map[publisher_id] = entity_type
+            self._publisher_ids.append(publisher_id)
 
     @property
     def publisher_ids(self):
-        return list(self._buffer.keys())
+        return self._publisher_ids
 
     def _slide(self):
         """
@@ -60,11 +63,12 @@ class SnapshotBuffer:
             - Remaining snapshots are shifted right by one position.
             - Index 0 is left empty for insertion of the newest snapshot.
         """
-        for publisher_id, snapshots in self._buffer.items():
-            self._buffer[publisher_id] = [None] + snapshots[:-1]
+        for snapshots in self._buffer.values():
+            snapshots[1:] = snapshots[:-1]
+            snapshots[0] = None
 
     def update_current_step(self, step: int) -> None:
-        
+
         if step < self.current_step:
             return  # Ignore updates to past steps
 
@@ -73,7 +77,6 @@ class SnapshotBuffer:
             self._slide()
 
         self.current_step = step
-
 
     def get_snapshot(self, publisher_id: int, delta_step: int) -> Optional[PerceptionSnapshot]:
         """
@@ -96,18 +99,18 @@ class SnapshotBuffer:
         snapshot = self._get_raw_snapshot(publisher_id, delta_step)
         if snapshot is not None:
             snapshot.update_normalized_delta(current_absolute_step=self.current_step,
-                                            max_delta_step=self.max_size)
+                                             max_delta_step=self.max_size)
 
-            #print(f"[DEBUG] LIDARBUFFER GET_SNAPSHOT() - normalized delta: {snapshot.normalized_delta}")
+            # print(f"[DEBUG] LIDARBUFFER GET_SNAPSHOT() - normalized delta: {snapshot.normalized_delta}")
         return snapshot
-    
+
     def get_random_snapshot(self, publisher_id: int, fresher_delta_step: int) -> Optional[PerceptionSnapshot]:
         if publisher_id not in self._buffer:
             return None
-
-        random_delta_step = random.randint(fresher_delta_step, self.max_size - 1)
+        random_delta_step = int(np.random.randint(
+            fresher_delta_step, self.max_size))
         return self.get_snapshot(publisher_id, random_delta_step)
-    
+
     def get_random_neighborhood(
         self,
         n_neighbors: int,
@@ -128,14 +131,20 @@ class SnapshotBuffer:
             List[PerceptionSnapshot]: Randomly chosen snapshots (may contain fewer than n_neighbors if unavailable).
         """
         candidates = [
-            pid for pid, et in self.publisher_entity_map.items()
-            if pid != exclude_publisher_id and (entity_type is None or et == entity_type)
+            pid for pid in self._publisher_ids
+            if pid != exclude_publisher_id
+            and (entity_type is None or self.publisher_entity_map.get(pid) == entity_type)
         ]
 
         if not candidates:
             return []
 
-        chosen_ids = random.sample(candidates, min(n_neighbors, len(candidates)))
+        if n_neighbors >= len(candidates):
+            chosen_ids = candidates
+        else:
+            chosen_indices = np.random.choice(
+                len(candidates), size=n_neighbors, replace=False)
+            chosen_ids = [candidates[int(i)] for i in chosen_indices]
 
         snaps = []
         for pid in chosen_ids:
@@ -144,17 +153,15 @@ class SnapshotBuffer:
 
         return snaps
 
-            
-
-
     def _get_raw_snapshot(self, publisher_id: int, delta_step: int) -> Optional[PerceptionSnapshot]:
         """
         Internal accessor: returns raw snapshot from buffer, without normalization.
         """
-        if publisher_id not in self._buffer:
+        snapshots = self._buffer.get(publisher_id)
+        if snapshots is None:
             return None
         delta_step = min(max(delta_step, 0), self.max_size - 1)
-        return self._buffer[publisher_id][delta_step]
+        return snapshots[delta_step]
 
     def _insert_snapshot(self, snapshot: PerceptionSnapshot, delta_step: int, track_snapshot: bool = False) -> None:
         """
@@ -201,7 +208,7 @@ class SnapshotBuffer:
                 entity_type=entity_type
             )
             self._insert_snapshot(snapshot, delta_step)
-            #print(f"[DEBUG] Snapshot created for publisher {publisher_id} at delta_step {delta_step}.")
+            # print(f"[DEBUG] Snapshot created for publisher {publisher_id} at delta_step {delta_step}.")
 
         return snapshot
 
@@ -219,10 +226,11 @@ class SnapshotBuffer:
         update it with a new broadcast message under the given topic.
         Uses `_ensure_snapshot` to safely retrieve the snapshot if missing.
         """
-        
-        snapshot = self._ensure_snapshot(publisher_id, delta_step, entity_type, debug)
 
-        #if hasattr(self, '_tracked_snapshots') and (publisher_id, delta_step, snapshot) in self._tracked_snapshots:
+        snapshot = self._ensure_snapshot(
+            publisher_id, delta_step, entity_type, debug)
+
+        # if hasattr(self, '_tracked_snapshots') and (publisher_id, delta_step, snapshot) in self._tracked_snapshots:
         #    print(f"[DEBUG] Attempt to modify Snapshot tracked for {publisher_id} at delta_step {delta_step}.")
         #    print("before, topic lidar data broadcast")
         #    print(snapshot.topics[TopicsEnum.LIDAR_DATA_BROADCAST])
@@ -231,14 +239,12 @@ class SnapshotBuffer:
 
         snapshot.update(topic=topic, data=message)
 
-        #if debug:
+        # if debug:
         #    print(f"[DEBUG] Recorded message for {publisher_id} at delta_step {delta_step}: {message}")
-            #print(snapshot.topics[TopicsEnum.LIDAR_DATA_BROADCAST])
+        # print(snapshot.topics[TopicsEnum.LIDAR_DATA_BROADCAST])
 
-        #if snapshot.topics[topic] is None:
+        # if snapshot.topics[topic] is None:
         #    snapshot.topics[topic] = message
-
-
 
     def remove_publisher(self, publisher_id: int) -> None:
         """
@@ -251,6 +257,8 @@ class SnapshotBuffer:
             del self._buffer[publisher_id]
         if publisher_id in self.publisher_entity_map:
             del self.publisher_entity_map[publisher_id]
+        if publisher_id in self._publisher_ids:
+            self._publisher_ids.remove(publisher_id)
 
     def print_status(self, freshest_data: int) -> None:
         print("\n📦 LiDARBufferManager Status Snapshot:")
@@ -275,22 +283,21 @@ class SnapshotBuffer:
                         f"   └─ [Δ={i}] ✅ {step_info} | Topics: {topic_list}")
             print()
 
+
 class LiDARBufferManager:
-    def __init__(self, current_step=0, max_buffer_size: int = 1, verbose:bool = False):
+    def __init__(self, current_step=0, max_buffer_size: int = 1, verbose: bool = False):
 
-
-        self._buffer:SnapshotBuffer = SnapshotBuffer(max_buffer_size)
+        self._buffer: SnapshotBuffer = SnapshotBuffer(max_buffer_size)
         self._publisher_entity_map: Dict[int, EntityType] = {}
+        self._empty_snapshots: List[PerceptionSnapshot] = []
 
         self.STABLE_DELTA_STEP = 1
         self.verbose = verbose
 
-
     def reset(self, new_step: int = 0):
         self._buffer = SnapshotBuffer(self._buffer.max_size)
-        #self._publisher_entity_map.clear() # the entities will kept same id.
         self._buffer.current_step = new_step
-
+        self._empty_snapshots = []
 
     @property
     def current_step(self) -> int:
@@ -320,23 +327,29 @@ class LiDARBufferManager:
         """
         snapshots: List[PerceptionSnapshot] = []
         target_publishers = publisher_ids if publisher_ids is not None else self._buffer.publisher_ids
+        publisher_entity_map = self._buffer.publisher_entity_map
+        buffer_map = self._buffer._buffer
 
         for publisher_id in target_publishers:
             if publisher_id == exclude_publisher_id:
                 continue
-            if publisher_id not in self._buffer.publisher_ids:
+            if publisher_id not in buffer_map:
                 continue
-            if entity_type is not None and self._publisher_entity_map.get(publisher_id) != entity_type:
+            if entity_type is not None and publisher_entity_map.get(publisher_id) != entity_type:
                 continue
 
             # Choose delta_step
             if delta_step is None:
-                max_valid = min(self._buffer.max_size - 1, self._buffer.current_step) #If current_step is 1, max_valid will be 1
-                random_delta = 0 if max_valid < self.STABLE_DELTA_STEP else random.randint(self.STABLE_DELTA_STEP, max_valid)
+                # If current_step is 1, max_valid will be 1
+                max_valid = min(self._buffer.max_size - 1,
+                                self._buffer.current_step)
+                random_delta = 0 if max_valid < self.STABLE_DELTA_STEP else int(
+                    np.random.randint(self.STABLE_DELTA_STEP, max_valid + 1))
             else:
                 random_delta = delta_step
 
-            snapshot = self._buffer.get_snapshot(publisher_id, random_delta) #self._get_snapshot(publisher_id, random_delta)
+            # self._get_snapshot(publisher_id, random_delta)
+            snapshot = self._buffer.get_snapshot(publisher_id, random_delta)
             if snapshot is None:
                 continue
             if topic is not None and topic not in snapshot.topics:
@@ -346,24 +359,18 @@ class LiDARBufferManager:
 
         return snapshots
 
-
-
-
-
     def close_buffer(self, publisher_id: int, topic: TopicsEnum) -> None:
         """
         I am not sure if this is necessary to do anything.
         Needed for compatibility with the old code (LIDAR).
         """
-        #TODO REMOVE ALL PUBLISHERS.
+        # TODO REMOVE ALL PUBLISHERS.
         self._buffer.remove_publisher(publisher_id)
 
-
-  
     def buffer_message_directly(self,
-                                 message: Dict,
-                                 publisher_id: int,
-                                 topic: TopicsEnum,):
+                                message: Dict,
+                                publisher_id: int,
+                                topic: TopicsEnum,):
         """
         This method is not implemented.
         It is a placeholder for future functionality.
@@ -371,32 +378,33 @@ class LiDARBufferManager:
         precisamos ajustar o step do lidar que é adicionado diretamente.
         """
         step = self._buffer.current_step - self.STABLE_DELTA_STEP
-        #message["step"] = step
+        # message["step"] = step
         message_context = MessageContext(
             publisher_id=publisher_id,
             step=step,
-            entity_type=EntityType.LOYALWINGMAN  # self._publisher_entity_map.get(publisher_id)
+            # self._publisher_entity_map.get(publisher_id)
+            entity_type=EntityType.LOYALWINGMAN
         )
 
-        #print(f"[DEBUG] FusedLIDAR BUFFER MESSAGE DIRECTLY - step: {step}, entity_type: {message_context.entity_type}, topic: {topic}")
-        #print(message)
+        # print(f"[DEBUG] FusedLIDAR BUFFER MESSAGE DIRECTLY - step: {step}, entity_type: {message_context.entity_type}, topic: {topic}")
+        # print(message)
 
         self._buffer.record_message(
             publisher_id=message_context.publisher_id,
             delta_step=self._buffer.current_step - step,
-            entity_type=EntityType.LOYALWINGMAN,  # Assuming the entity type is always LOYALWINGMAN for direct messages
+            # Assuming the entity type is always LOYALWINGMAN for direct messages
+            entity_type=EntityType.LOYALWINGMAN,
             topic=topic,
             message=message,
             debug=True
 
         )
 
-        #self.buffer_message(
+        # self.buffer_message(
         #    message=message,
         #    message_context=message_context,
         #    topic=topic
-        #)
-
+        # )
 
     def buffer_message(
         self,
@@ -412,14 +420,16 @@ class LiDARBufferManager:
 
         # Try to fallback to already known entity type
         if entity_type is None:
-            entity_type = self._publisher_entity_map.get(message_context.publisher_id)
+            entity_type = self._buffer.publisher_entity_map.get(
+                message_context.publisher_id)
 
         # If we still don't know the entity type, we can't proceed
         if entity_type is None:
             if self.verbose:
-                print(f"[WARNING] Entity type missing for publisher {message_context.publisher_id}. Message discarded.")
+                print(
+                    f"[WARNING] Entity type missing for publisher {message_context.publisher_id}. Message discarded.")
             return
-        
+
         step = message_context.step if message_context.step is not None else -1
         if step < 0:
             step = self._buffer.current_step
@@ -461,7 +471,6 @@ class LiDARBufferManager:
             exclude_publisher_id=exclude_publisher_id
         )
 
-
     def get_latest_threats(self) -> List[PerceptionSnapshot]:
         """
         Get the latest snapshot (delta_step = 0) for all LOITERINGMUNITIONs.
@@ -471,7 +480,7 @@ class LiDARBufferManager:
             delta_step=self.STABLE_DELTA_STEP
         )
 
-    def get_latests(self, exclude_publisher_id:Optional[int]=None):
+    def get_latests(self, exclude_publisher_id: Optional[int] = None):
         """
         The latest stable reading that reflects the world after the previous update cycle.
         maybe, There should be a (little) discrepancy between the real state and the extract state.
@@ -481,7 +490,7 @@ class LiDARBufferManager:
             delta_step=self.STABLE_DELTA_STEP,
             exclude_publisher_id=exclude_publisher_id
         )
-    
+
     def get_latest_messages_from_topic(
         self,
         topic: TopicsEnum,
@@ -507,11 +516,12 @@ class LiDARBufferManager:
             exclude_publisher_id=exclude_publisher_id
         )
 
-        return {
-            snapshot.publisher_id: snapshot.topics[topic]
-            for snapshot in snapshots
-            if topic in snapshot.topics
-        }
+        messages = {}
+        for snapshot in snapshots:
+            message = snapshot.topics.get(topic)
+            if message is not None:
+                messages[snapshot.publisher_id] = message
+        return messages
 
     def print_buffer_status(self) -> None:
         self._buffer.print_status(self.STABLE_DELTA_STEP)

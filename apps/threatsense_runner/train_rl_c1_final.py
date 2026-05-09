@@ -25,11 +25,12 @@ def train_fixed_ppo(
     n_timesteps: int,
     device: torch.device,
     callback_list,
-    
+
 ):
 
     # Modelo PPO com parâmetros fixos
-    model = PPO.load(base_model_path, env=vectorized_environment, device=device)
+    model = PPO.load(
+        base_model_path, env=vectorized_environment, device=device)
     model.learning_rate = 1e-3
     model.batch_size = 128
 
@@ -44,7 +45,7 @@ def train_fixed_ppo(
     )
 
     return model
-    
+
 
 def main():
     print("LEVEL 5 C1 EXP01 - Air Combat - PPO Fixed LR=1e-3")
@@ -57,12 +58,10 @@ def main():
     base_dir = os.path.join("output\\rl\\13.09.2025")
     DirectoryManager.create_directory(base_dir)
 
-
     # Criar ambiente vetorizado
     vectorized_environment = ReinforcementLearningPipeline.create_vectorized_environment(
         environment=Level5C1Fusion, env_kwargs={}, n_envs=4
     )
-
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -83,10 +82,9 @@ def main():
                 CallbackType.EVAL, CallbackType.CHECKPOINT, CallbackType.PROGRESSBAR],
             n_eval_episodes=n_eval_episodes,
             debug=True,
-            step_size_save=100_000,
+            save_freq=100_000,
             steps=n_timesteps
         )
-
 
         model = train_fixed_ppo(
             base_model_path=input_model,
@@ -100,12 +98,9 @@ def main():
         model_path = os.path.join(run_models_dir, "final.zip")
         model.save(model_path)
 
-        
-        
         avg_reward, std_dev, num_episodes, episode_rewards = ReinforcementLearningPipeline.evaluate(
             model, vectorized_environment, n_eval_episodes=n_eval_episodes
         )
-
 
         results = {
             "run": i+1,
